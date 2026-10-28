@@ -110,8 +110,21 @@ async function submit(req, res) {
   fd.append("files[0]", new Blob([img], { type: "image/" + m[1] }), "photo." + ext);
 
   try {
-    const r = await fetch(WEBHOOK, { method: "POST", body: fd });
-    if (!r.ok) throw new Error("Discord " + r.status);
+    let r;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      r = await fetch(WEBHOOK, { method: "POST", body: fd });
+      if (r.status !== 429) break;
+      // Discord จำกัดความถี่ชั่วคราว: รอตามที่ Discord บอกแล้วลองใหม่ (ไม่เกิน 8 วินาทีต่อครั้ง)
+      let wait = 2;
+      try { wait = Number(r.headers.get("retry-after")) || (await r.clone().json()).retry_after || 2; } catch (e) {}
+      console.error("Discord 429 รอ " + wait + " วินาที (ครั้งที่ " + (attempt + 1) + ")");
+      if (attempt < 2) await new Promise(ok => setTimeout(ok, Math.min(wait, 8) * 1000));
+    }
+    if (!r.ok) {
+      let body = ""; try { body = (await r.text()).slice(0, 200); } catch (e) {}
+      console.error("Discord ตอบกลับ", r.status, body);
+      throw new Error("Discord " + r.status);
+    }
     saveSent();
     json(res, 200, { ok: true });
   } catch (e) {
