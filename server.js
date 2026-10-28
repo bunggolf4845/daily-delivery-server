@@ -118,7 +118,11 @@ async function submit(req, res) {
       let wait = 2;
       try { wait = Number(r.headers.get("retry-after")) || (await r.clone().json()).retry_after || 2; } catch (e) {}
       console.error("Discord 429 รอ " + wait + " วินาที (ครั้งที่ " + (attempt + 1) + ")");
-      if (attempt < 2) await new Promise(ok => setTimeout(ok, Math.min(wait, 8) * 1000));
+      if (wait > 10) { // ถูกบล็อกยาว ไม่ต้องลองซ้ำ ลองซ้ำมีแต่จะยิ่งโดนนาน
+        delete sent[key];
+        return json(res, 503, { error: "Discord บล็อกการส่งชั่วคราว ลองใหม่อีกครั้งในอีก " + Math.ceil(wait / 60) + " นาที" });
+      }
+      if (attempt < 2) await new Promise(ok => setTimeout(ok, wait * 1000));
     }
     if (!r.ok) {
       let body = ""; try { body = (await r.text()).slice(0, 200); } catch (e) {}
