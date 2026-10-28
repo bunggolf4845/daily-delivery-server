@@ -65,12 +65,23 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   </div>
 </main>
 <script>
-const $ = id => document.getElementById(id);
-const msg = (t, c) => { $("msg").textContent = t; $("msg").className = c || ""; };
+// ===== ตั้งค่า: ใส่ Discord Webhook URL ของคุณตรงนี้ =====
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1564871852503998505/sunbaweJ6VZ-U62noJ9-Uv6FVgJ1MCOQIp6sRwlP43wtIxpNP9yuz9zfop5hXva9Xdx9";
+// รายการประเภทของ แก้ไข/เพิ่ม/ลบได้ตามเกมของคุณ
+const ITEM_TYPES = ["วัตถุดิบ", "แร่", "ยา/ไอเทมฟื้นฟู", "อาวุธ/อุปกรณ์", "เงิน/เหรียญ", "อื่นๆ"];
+// =======================================================
 
-fetch("/api/config").then(r => r.json()).then(c => {
-  c.itemTypes.forEach(t => { const o = document.createElement("option"); o.value = o.textContent = t; $("type").appendChild(o); });
-}).catch(() => msg("โหลดรายการประเภทของไม่สำเร็จ ลองรีเฟรชหน้า", "err"));
+const $ = id => document.getElementById(id);
+ITEM_TYPES.forEach(t => { const o = document.createElement("option"); o.value = o.textContent = t; $("type").appendChild(o); });
+
+// กันส่งซ้ำ: 1 ชื่อในเกม ส่งได้ 1 ครั้งต่อวัน (จำไว้ในเบราว์เซอร์)
+const todayKey = ign => {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return "delivered:" + d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + ":" + ign.toLowerCase();
+};
+const alreadySent = k => { try { return !!localStorage.getItem(k); } catch (e) { return false; } };
+const markSent = k => { try { localStorage.setItem(k, "1"); } catch (e) {} };
+const msg = (t, c) => { $("msg").textContent = t; $("msg").className = c || ""; };
 
 $("pic").addEventListener("change", () => {
   const f = $("pic").files[0];
@@ -81,37 +92,51 @@ $("pic").addEventListener("change", () => {
   $("hint").style.display = "none";
 });
 
-const readAsDataURL = f => new Promise((res, rej) => {
-  const r = new FileReader();
-  r.onload = () => res(r.result);
-  r.onerror = () => rej(new Error("อ่านไฟล์รูปไม่ได้"));
-  r.readAsDataURL(f);
-});
-
 $("send").addEventListener("click", async () => {
   const dc = $("dc").value.trim(), ign = $("ign").value.trim(), f = $("pic").files[0];
-  const type = $("type").value, qty = parseInt($("qty").value, 10);
   if (!dc || !ign) return msg("กรุณากรอกชื่อ Discord และชื่อในเกม", "err");
+  const type = $("type").value, qty = parseInt($("qty").value, 10);
   if (!qty || qty < 1) return msg("กรุณากรอกจำนวนชิ้น (อย่างน้อย 1)", "err");
+  const key = todayKey(ign);
+  if (alreadySent(key)) return msg("วันนี้ส่งของในชื่อ “" + ign + "” ไปแล้ว พรุ่งนี้ส่งได้ใหม่", "err");
   if (!f) return msg("กรุณาแนบรูป", "err");
   if (f.size > 8 * 1024 * 1024) return msg("รูปใหญ่เกิน 8 MB กรุณาเลือกรูปที่เล็กกว่านี้", "err");
+  if (WEBHOOK_URL.startsWith("PASTE_")) return msg("ยังไม่ได้ตั้งค่า Webhook URL ในไฟล์", "err");
+
+  const date = new Date().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+  const payload = {
+    username: "ส่งของรายวัน",
+    allowed_mentions: { parse: [] },
+    embeds: [{
+      title: "📦 ส่งของรายวัน",
+      color: 0x1f7a5c,
+      fields: [
+        { name: "ชื่อ Discord", value: dc, inline: true },
+        { name: "ชื่อในเกม", value: ign, inline: true },
+        { name: "ประเภทของ", value: type, inline: true },
+        { name: "จำนวน", value: qty.toLocaleString("th-TH") + " ชิ้น", inline: true },
+        { name: "เวลา", value: date }
+      ],
+      image: { url: "attachment://" + (f.name.replace(/[^\w.\-]/g, "_") || "photo.png") }
+    }]
+  };
+  const safeName = f.name.replace(/[^\w.\-]/g, "_") || "photo.png";
+  const fd = new FormData();
+  fd.append("payload_json", JSON.stringify(payload));
+  fd.append("files[0]", f, safeName);
 
   $("send").disabled = true;
   msg("กำลังส่ง...");
   try {
-    const image = await readAsDataURL(f);
-    const r = await fetch("/api/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dc, ign, type, qty, image })
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || ("ผิดพลาด " + r.status));
+    const r = await fetch(WEBHOOK_URL, { method: "POST", body: fd });
+    if (r.status === 429) throw new Error("Discord จำกัดการส่งชั่วคราว กรุณารอสักครู่แล้วลองใหม่");
+    if (!r.ok) throw new Error("ผิดพลาด " + r.status);
+    markSent(key);
     msg("ส่งเรียบร้อยแล้ว ✅", "ok");
     $("dc").value = $("ign").value = $("qty").value = ""; $("pic").value = "";
     $("prev").style.display = "none"; $("hint").style.display = "";
   } catch (e) {
-    msg(e.message, "err");
+    msg(/^ผิดพลาด|^Discord/.test(e.message) ? e.message : "ส่งไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่", "err");
   } finally {
     $("send").disabled = false;
   }
