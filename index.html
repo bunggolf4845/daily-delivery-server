@@ -224,7 +224,7 @@ const CFG = window.APP_CONFIG || {};
 const WEBHOOK_URL = CFG.webhookUrl || "PASTE_YOUR_DISCORD_WEBHOOK_URL_HERE";
 const SUPABASE_URL = CFG.supabaseUrl || "PASTE_YOUR_SUPABASE_URL_HERE";
 const SUPABASE_KEY = CFG.supabaseKey || "PASTE_YOUR_SUPABASE_KEY_HERE";
-const ITEM_TYPES = CFG.itemTypes || ["วัตถุดิบ", "แร่", "ยา/ไอเทมฟื้นฟู", "อาวุธ/อุปกรณ์", "เงิน/เหรียญ", "อื่นๆ"];
+const ITEM_TYPES = CFG.itemTypes || ["แร่", "กำมะถัน", "อื่นๆ"];
 
 const $ = id => document.getElementById(id);
 ITEM_TYPES.forEach(t => { const o = document.createElement("option"); o.value = o.textContent = t; $("type").appendChild(o); });
@@ -364,6 +364,11 @@ const bkkMonth = offset => { // คืนค่า {key:"2026-10", label:"ตุ
   return { key, label: new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" }) };
 };
 let boardOffset = 0;
+// สีแถบข้างและไอคอนของการ์ดใน Discord ตามประเภทของ (จับจากคำในชื่อ ใส่เพิ่มได้)
+const TYPE_STYLES = [
+  [/แร่/, "⛏️", 0xF2B42B], [/กำมะถัน|ซัลเฟอร์/, "🟡", 0xE8D44D]
+];
+function styleFor(t) { const m = TYPE_STYLES.find(x => x[0].test(t)); return m ? { icon: m[1], color: m[2] } : { icon: "📦", color: 0x1f7a5c }; }
 // รวมชื่อที่พิมพ์ผิด: ใส่ "ชื่อที่ผิด": "ชื่อที่ถูก" ได้เรื่อยๆ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
 const ALIASES = { "Cannaÿ2026": "Cannanÿ2026" };
 function mergeAliases(data) {
@@ -478,15 +483,16 @@ $("send").addEventListener("click", async () => {
     const names = blobs.map((x, i) => "photo" + (i + 1) + "." + (EXT[x.type] || "jpg"));
     const date = new Date().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
     const gal = blobs.length > 1 ? "https://discord.com" : undefined; // embed ที่ url เดียวกันจะรวมเป็นแกลเลอรี
+    const sty = styleFor(type), big = qty >= 10000, same = String(dc).trim().toLowerCase() === String(ign).trim().toLowerCase();
+    const fields = [
+      { name: "👤 ชื่อในเกม", value: "**" + ign + "**", inline: true },
+      { name: sty.icon + " ประเภท", value: type, inline: true },
+      { name: "📊 จำนวน", value: "**" + qty.toLocaleString("th-TH") + "** ชิ้น", inline: true }
+    ];
+    if (!same) fields.push({ name: "💬 Discord", value: dc, inline: true });
     const embeds = [{
-      title: "📦 ส่งของรายวัน", color: 0x1f7a5c, url: gal,
-      fields: [
-        { name: "ชื่อ Discord", value: dc, inline: true },
-        { name: "ชื่อในเกม", value: ign, inline: true },
-        { name: "ประเภทของ", value: type, inline: true },
-        { name: "จำนวน", value: qty.toLocaleString("th-TH") + " ชิ้น", inline: true },
-        { name: "เวลา", value: date }
-      ],
+      title: (big ? "🔥 " : "") + sty.icon + " ส่งของรายวัน" + (big ? " · ยอดใหญ่!" : ""), color: sty.color, url: gal,
+      fields, timestamp: new Date().toISOString(), footer: { text: "Rockman · ส่งของรายวัน" },
       image: { url: "attachment://" + names[0] }
     }];
     for (let i = 1; i < blobs.length; i++) embeds.push({ url: gal, image: { url: "attachment://" + names[i] } });
