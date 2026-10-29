@@ -518,7 +518,7 @@ $("send").addEventListener("click", async () => {
   const buzz = n => { try { navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
   // 1) ปุ่มเติมจำนวนเร็ว
   const chips = g("chips");
-  [[5, "+5"], [10, "+10"], [50, "+50"], [100, "+100"]].forEach(([n, t]) => {
+  [[1000, "+1000"], [2000, "+2000"], [5000, "+5000"], [10000, "+10000"]].forEach(([n, t]) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = t;
     b.addEventListener("click", () => { g("qty").value = Math.min(99999, (parseInt(g("qty").value, 10) || 0) + n); g("qty").dispatchEvent(new Event("input")); buzz(10); });
     chips.appendChild(b);
