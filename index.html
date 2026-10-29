@@ -364,6 +364,33 @@ const bkkMonth = offset => { // คืนค่า {key:"2026-10", label:"ตุ
   return { key, label: new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" }) };
 };
 let boardOffset = 0;
+// ===== สตรีก / ประกาศ Discord / สรุปปิดเดือน =====
+let STREAKS = {};
+async function loadStreaks() {
+  try { const a = await rpc("get_streaks"); STREAKS = {}; (a || []).forEach(x => { STREAKS[String(x.k).toLowerCase()] = x.n; }); } catch (e) {}
+}
+const fl = d => { const n = STREAKS[String(d.ign).toLowerCase()]; return n ? " 🔥" + n : ""; };
+const hook = embed => fetch(WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [embed] }) });
+async function topNow() { try { return mergeAliases(await rpc("leaderboard", { p_month: bkkMonth(0).key }))[0] || null; } catch (e) { return null; } }
+async function announceTop(before, ign) {
+  try {
+    const after = await topNow();
+    if (!before || !after || String(after.ign).toLowerCase() === String(before.ign).toLowerCase()) return;
+    if (String(after.ign).toLowerCase() !== String(ign).toLowerCase()) return;
+    await hook({ title: "👑 เปลี่ยนเจ้าของอันดับ 1!", color: 0xF2B42B, description: "**" + after.ign + "** แซง **" + before.ign + "** ขึ้นเป็นอันดับ 1 ด้วย **" + Number(after.total).toLocaleString("th-TH") + "** ชิ้น", footer: { text: "Rockman · ส่งของรายวัน" } });
+  } catch (e) {}
+}
+async function postLastMonthSummary() {
+  if (!BOARD_ON || WEBHOOK_URL.startsWith("PASTE_")) return;
+  const mo = bkkMonth(-1);
+  try {
+    if ((await rpc("claim_month_post", { p_month: mo.key })) !== true) return;
+    const top = mergeAliases(await rpc("leaderboard", { p_month: mo.key })).slice(0, 3);
+    if (!top.length) return;
+    const medals = ["🥇", "🥈", "🥉"];
+    await hook({ title: "🏆 สรุปอันดับประจำเดือน " + mo.label, color: 0xF2B42B, description: top.map((d, i) => medals[i] + " **" + d.ign + "** — " + Number(d.total).toLocaleString("th-TH") + " ชิ้น (" + d.days + " วัน)").join("\n") + "\n\nขอบคุณทุกคนที่ส่งของ 💛", footer: { text: "Rockman · ส่งของรายวัน" } });
+  } catch (e) {}
+}
 // สีแถบข้างและไอคอนของการ์ดใน Discord ตามประเภทของ (จับจากคำในชื่อ ใส่เพิ่มได้)
 const TYPE_STYLES = [
   [/แร่/, "⛏️", 0xF2B42B], [/กำมะถัน|ซัลเฟอร์/, "🟡", 0xE8D44D]
@@ -390,6 +417,7 @@ async function loadBoard() {
   $("tabPrev").setAttribute("aria-pressed", boardOffset === -1);
   rows.innerHTML = ""; $("pod").innerHTML = ""; $("mine").hidden = true; tick();
   try {
+    await loadStreaks();
     const data = mergeAliases(await rpc("leaderboard", { p_month: mo.key }));
     if (!data || !data.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = "ยังไม่มีข้อมูลของเดือนนี้"; rows.appendChild(p); return; }
     const me = (savedNames().ign || "").toLowerCase(), isMe = d => !!me && String(d.ign).toLowerCase() === me;
@@ -400,7 +428,7 @@ async function loadBoard() {
       const d = data[i]; if (!d) return;
       const w = document.createElement("div"); w.className = "p " + cls[i] + (isMe(d) ? " me" : "");
       if (i === 0) { const c = document.createElement("div"); c.className = "crown"; c.textContent = "👑"; w.appendChild(c); }
-      const nm = document.createElement("div"); nm.className = "pn"; nm.textContent = d.ign + (isMe(d) ? " ⭐" : "");
+      const nm = document.createElement("div"); nm.className = "pn"; nm.textContent = d.ign + fl(d) + (isMe(d) ? " ⭐" : "");
       const pt = document.createElement("div"); pt.className = "pt";
       const tv = document.createElement("span"); countUp(tv, Number(d.total)); pt.appendChild(tv);
       const sm = document.createElement("small"); sm.textContent = d.days + " วัน"; pt.appendChild(sm);
@@ -411,7 +439,7 @@ async function loadBoard() {
     data.slice(3).forEach((d, k) => {
       const li = document.createElement("li"); if (isMe(d)) li.className = "me";
       const rk = document.createElement("span"); rk.className = "rk"; rk.textContent = k + 4;
-      const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.ign + (isMe(d) ? " ⭐ (คุณ)" : "");
+      const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.ign + fl(d) + (isMe(d) ? " ⭐ (คุณ)" : "");
       const tt = document.createElement("span"); tt.className = "tt";
       const b = document.createElement("b"); countUp(b, Number(d.total));
       const sm = document.createElement("small"); sm.textContent = d.days + " วัน";
@@ -510,8 +538,10 @@ $("send").addEventListener("click", async () => {
     if (!r.ok) throw new Error("ผิดพลาด " + r.status);
     markSent(key); saveNames(dc, ign); setToday(true); try { window.logHist(ign, type, qty); } catch (e) {}
     if (BOARD_ON) {
+      const topB = await topNow();
       try { await rpc("add_delivery", { p_ign: ign, p_dc: dc, p_type: type, p_qty: qty }); }
       catch (e) { saved = false; }
+      if (saved) announceTop(topB, ign);
     }
     msg(saved ? "ส่งเรียบร้อยแล้ว ✅" : "ส่งเข้า Discord แล้ว แต่บันทึกอันดับไม่สำเร็จ กรุณาแจ้งแอดมิน", saved ? "ok" : "err");
     if (BOARD_ON && saved) loadBoard();
@@ -614,6 +644,7 @@ $("send").addEventListener("click", async () => {
   window.logHist = () => loadRecent();
   loadRecent(); setInterval(loadRecent, 60000); setInterval(renderRecent, 30000);
   g("send").addEventListener("click", () => buzz(20));
+  try { postLastMonthSummary(); } catch (e) {}
 })();
 </script>
 </body>
