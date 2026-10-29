@@ -211,10 +211,9 @@ p.sub{line-height:1.5}
     <ol class="rows" id="rows"></ol>
   </section>
   <section class="card hist" id="histCard" hidden>
-    <h2>🧾 ประวัติการส่งของของฉัน</h2>
+    <h2>📜 รายการส่งล่าสุดของทุกคน</h2>
     <p class="hsum" id="hsum"></p>
     <ul id="hlist"></ul>
-    <button type="button" class="clr" id="hclr">ล้างประวัติในเครื่องนี้</button>
   </section>
   <p class="ft">Rockman · ส่งของรายวัน</p>
 </main>
@@ -365,6 +364,18 @@ const bkkMonth = offset => { // คืนค่า {key:"2026-10", label:"ตุ
   return { key, label: new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" }) };
 };
 let boardOffset = 0;
+// รวมชื่อที่พิมพ์ผิด: ใส่ "ชื่อที่ผิด": "ชื่อที่ถูก" ได้เรื่อยๆ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
+const ALIASES = { "Cannaÿ2026": "Cannanÿ2026" };
+function mergeAliases(data) {
+  const map = {}; Object.keys(ALIASES).forEach(k => { map[k.toLowerCase()] = ALIASES[k]; });
+  const out = new Map();
+  (data || []).forEach(d => {
+    const name = map[String(d.ign).toLowerCase()] || d.ign, key = String(name).toLowerCase(), cur = out.get(key);
+    if (!cur) out.set(key, Object.assign({}, d, { ign: name, total: Number(d.total) }));
+    else { cur.total += Number(d.total); cur.days = Math.max(Number(cur.days) || 0, Number(d.days) || 0); }
+  });
+  return [...out.values()].sort((x, y) => y.total - x.total);
+}
 async function loadBoard() {
   if (!BOARD_ON) return;
   $("boardCard").hidden = false;
@@ -374,7 +385,7 @@ async function loadBoard() {
   $("tabPrev").setAttribute("aria-pressed", boardOffset === -1);
   rows.innerHTML = ""; $("pod").innerHTML = ""; $("mine").hidden = true; tick();
   try {
-    const data = await rpc("leaderboard", { p_month: mo.key });
+    const data = mergeAliases(await rpc("leaderboard", { p_month: mo.key }));
     if (!data || !data.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = "ยังไม่มีข้อมูลของเดือนนี้"; rows.appendChild(p); return; }
     const me = (savedNames().ign || "").toLowerCase(), isMe = d => !!me && String(d.ign).toLowerCase() === me;
     renderMine(data);
@@ -571,19 +582,31 @@ $("send").addEventListener("click", async () => {
   ["dc", "ign", "type", "qty"].forEach(i => { g(i).addEventListener("input", upd); g(i).addEventListener("change", upd); });
   new MutationObserver(upd).observe(g("thumbs"), { childList: true });
   setTimeout(upd, 300); setInterval(upd, 1500);
-  // 5) ประวัติการส่งของ (เก็บในเครื่องนี้)
-  const HK = "rm_history", esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const readH = () => { try { return JSON.parse(localStorage.getItem(HK)) || []; } catch (e) { return []; } };
-  const renderH = () => {
-    const h = readH(), now = new Date();
-    g("histCard").hidden = !h.length; if (!h.length) return;
-    const m = h.filter(x => { const d = new Date(x.t); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
-    g("hsum").textContent = "เดือนนี้ส่งแล้ว " + m.length + " ครั้ง · รวม " + m.reduce((a, x) => a + x.q, 0).toLocaleString("en-US") + " ชิ้น";
-    g("hlist").innerHTML = h.slice(0, 10).map(x => "<li><span>" + esc(x.ty) + "<small>" + new Date(x.t).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }) + " · " + esc(x.n) + "</small></span><b>" + x.q.toLocaleString("en-US") + " ชิ้น</b></li>").join("");
+  // 5) รายการส่งล่าสุดของทุกคน (ดึงจาก Supabase)
+  const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const pick = (r, ks) => { for (const k of ks) if (r[k] != null && r[k] !== "") return r[k]; return null; };
+  const ago = t => {
+    const m = Math.floor((Date.now() - new Date(t).getTime()) / 60000);
+    if (isNaN(m)) return ""; if (m < 1) return "เมื่อสักครู่"; if (m < 60) return m + " นาทีที่แล้ว";
+    if (m < 1440) return Math.floor(m / 60) + " ชั่วโมงที่แล้ว";
+    return new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
   };
-  window.logHist = (n, ty, q) => { const h = readH(); h.unshift({ t: Date.now(), n, ty, q: Number(q) || 0 }); try { localStorage.setItem(HK, JSON.stringify(h.slice(0, 60))); } catch (e) {} renderH(); };
-  g("hclr").addEventListener("click", () => { try { localStorage.removeItem(HK); } catch (e) {} renderH(); });
-  renderH();
+  let recent = [];
+  const renderRecent = () => {
+    g("histCard").hidden = !recent.length; if (!recent.length) return;
+    g("hsum").textContent = "ล่าสุด " + recent.length + " รายการ";
+    g("hlist").innerHTML = recent.map(r => {
+      const t = pick(r, ["created_at", "inserted_at", "sent_at", "ts", "time", "created"]) || r.day;
+      const q = Number(pick(r, ["qty", "quantity", "amount", "total"])) || 0;
+      return "<li><span><strong>" + esc(r.ign) + "</strong><small>" + esc(pick(r, ["item_type", "type"]) || "") + " · " + esc(ago(t)) + "</small></span><b>" + q.toLocaleString("en-US") + " ชิ้น</b></li>";
+    }).join("");
+  };
+  const loadRecent = async () => {
+    if (!BOARD_ON) return;
+    try { const d = await rpc("recent_deliveries", { p_limit: 20 }); recent = Array.isArray(d) ? d : []; renderRecent(); } catch (e) {}
+  };
+  window.logHist = () => loadRecent();
+  loadRecent(); setInterval(loadRecent, 60000); setInterval(renderRecent, 30000);
   g("send").addEventListener("click", () => buzz(20));
 })();
 </script>
