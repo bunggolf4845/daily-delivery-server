@@ -16,7 +16,9 @@ h2{font-size:1rem;color:var(--hi);margin:0 0 10px}
 input{width:100%;padding:12px;margin:0 0 8px;border-radius:10px;border:1px solid var(--line);background:#080808;color:var(--txt);font-size:1rem}
 button{padding:11px 14px;border:0;border-radius:10px;background:linear-gradient(180deg,var(--hi),var(--gold));color:#1a1405;font-weight:700;font-size:.95rem}
 button.sec{background:#221d10;color:var(--hi);border:1px solid var(--line)}
+button.edt{background:#221d10;color:var(--hi);border:1px solid var(--line);padding:7px 10px;font-size:.8rem}
 button.del{background:#2a1413;color:#ff8b84;border:1px solid #5a2623;padding:7px 10px;font-size:.8rem}
+.btns{display:flex;gap:6px}
 .row{display:flex;gap:8px;align-items:center}
 .row>*{flex:1}.row>button{flex:0 0 auto}
 ul{list-style:none;margin:0;padding:0}
@@ -75,7 +77,7 @@ async function rpc(name, args) {
 const pick = (r, ks) => { for (const k of ks) if (r[k] != null && r[k] !== "") return r[k]; return ""; };
 async function load() {
   const rows = await rpc("admin_list", { p_pass: PASS, p_limit: 50 });
-  $("list").innerHTML = (rows || []).map(r => "<li><span><b>" + esc(r.ign) + "</b> · " + esc(pick(r, ["item_type", "type"])) + " · " + Number(pick(r, ["qty", "quantity", "amount"]) || 0).toLocaleString("en-US") + " ชิ้น<small>#" + r.id + " · " + esc(r.day) + " · Discord: " + esc(r.dc) + "</small></span><button class='del' data-id='" + r.id + "'>ลบ</button></li>").join("") || "<li>ยังไม่มีรายการ</li>";
+  $("list").innerHTML = (rows || []).map(r => "<li><span><b>" + esc(r.ign) + "</b> · " + esc(pick(r, ["item_type", "type"])) + " · " + Number(pick(r, ["qty", "quantity", "amount"]) || 0).toLocaleString("en-US") + " ชิ้น<small>#" + r.id + " · " + esc(r.day) + " · Discord: " + esc(r.dc) + "</small></span><span class='btns'><button class='edt' data-id='" + r.id + "' data-q='" + Number(pick(r, ["qty", "quantity", "amount"]) || 0) + "'>แก้</button><button class='del' data-id='" + r.id + "'>ลบ</button></span></li>").join("") || "<li>ยังไม่มีรายการ</li>";
 }
 async function enter() {
   PASS = $("pass").value; if (!PASS) return;
@@ -85,6 +87,14 @@ async function enter() {
 $("go").onclick = enter;
 $("pass").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
 $("list").addEventListener("click", async e => {
+  const eb = e.target.closest("button.edt");
+  if (eb) {
+    const v = prompt("จำนวนใหม่ของรายการ #" + eb.dataset.id + " (เดิม " + eb.dataset.q + " ชิ้น)", eb.dataset.q);
+    if (v === null) return;
+    const q = parseInt(v, 10); if (!(q >= 1 && q <= 99999)) return say("จำนวนต้องเป็นตัวเลข 1 ถึง 99,999", "err");
+    try { await rpc("admin_set_qty", { p_pass: PASS, p_id: Number(eb.dataset.id), p_qty: q }); say("แก้จำนวนแล้ว", "ok"); await load(); } catch (e3) { say("แก้ไม่สำเร็จ (ยังไม่ได้รัน SQL ของฟังก์ชันแก้จำนวนหรือเปล่า)", "err"); }
+    return;
+  }
   const b = e.target.closest("button.del"); if (!b) return;
   if (!confirm("ลบรายการ #" + b.dataset.id + " ?")) return;
   try { await rpc("admin_delete", { p_pass: PASS, p_id: Number(b.dataset.id) }); say("ลบแล้ว", "ok"); await load(); } catch (e2) { say("ลบไม่สำเร็จ", "err"); }
