@@ -156,6 +156,16 @@ p.sub{line-height:1.5}
 .hist li small{display:block;color:var(--mute);font-size:.75rem}
 .hist li b{color:var(--gold-hi);white-space:nowrap}
 .hist .clr{margin-top:10px;background:none;border:0;box-shadow:none;color:var(--mute);text-decoration:underline;font-size:.8rem;width:auto;padding:4px 0}
+
+/* กราฟยอดรายวัน */
+.bars{display:flex;align-items:flex-end;gap:3px}
+.bc{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bc .col{height:104px;width:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px}
+.bc b{font-size:.58rem;color:var(--mute);font-weight:500;white-space:nowrap}
+.bc i{display:block;width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));min-height:2px;animation:up .5s ease-out both}
+.bc.z i{background:#2a2418}
+.bc span{font-size:.65rem;color:var(--mute)}
+.bc.t span{color:var(--gold-hi);font-weight:700}
 </style>
 </head>
 <body>
@@ -209,6 +219,11 @@ p.sub{line-height:1.5}
     <div class="mine" id="mine" hidden></div>
     <div class="pod" id="pod"></div>
     <ol class="rows" id="rows"></ol>
+  </section>
+  <section class="card hist" id="chartCard" hidden>
+    <h2>📈 ยอดส่งรายวัน</h2>
+    <p class="hsum" id="chartSum"></p>
+    <div class="bars" id="bars"></div>
   </section>
   <section class="card hist" id="histCard" hidden>
     <h2>📜 รายการส่งล่าสุดของทุกคน</h2>
@@ -641,10 +656,38 @@ $("send").addEventListener("click", async () => {
     if (!BOARD_ON) return;
     try { const d = await rpc("recent_deliveries", { p_limit: 20 }); recent = Array.isArray(d) ? d : []; renderRecent(); } catch (e) {}
   };
-  window.logHist = () => loadRecent();
+  window.logHist = () => { loadRecent(); setTimeout(() => { try { loadChart(); } catch (e) {} }, 1500); };
   loadRecent(); setInterval(loadRecent, 60000); setInterval(renderRecent, 30000);
   g("send").addEventListener("click", () => buzz(20));
   try { postLastMonthSummary(); } catch (e) {}
+  // 6) ชื่อแนะนำตอนพิมพ์ (จากอันดับเดือนนี้และเดือนที่แล้ว)
+  const dl = document.createElement("datalist"); dl.id = "ignList"; document.body.appendChild(dl); g("ign").setAttribute("list", "ignList");
+  (async () => {
+    if (!BOARD_ON) return;
+    try {
+      const out = new Set();
+      for (const off of [0, -1]) (mergeAliases(await rpc("leaderboard", { p_month: bkkMonth(off).key })) || []).forEach(d => out.add(d.ign));
+      dl.innerHTML = [...out].map(n => '<option value="' + esc(n) + '">').join("");
+    } catch (e) {}
+  })();
+  // 7) กราฟยอดส่งรายวัน 14 วัน
+  const bkkDay = back => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date(Date.now() - back * 864e5));
+  const short = v => v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + "k" : String(v);
+  const loadChart = async () => {
+    if (!BOARD_ON) return;
+    try {
+      const a = await rpc("daily_totals", { p_days: 14 }), m = {}, days = [];
+      (a || []).forEach(x => { m[x.d] = Number(x.t); });
+      for (let i = 13; i >= 0; i--) { const k = bkkDay(i); days.push([k, m[k] || 0]); }
+      const max = Math.max(...days.map(x => x[1]), 1), sum = days.reduce((t, x) => t + x[1], 0);
+      if (!sum) return;
+      g("chartCard").hidden = false;
+      g("chartSum").textContent = "14 วันล่าสุด รวม " + sum.toLocaleString("en-US") + " ชิ้น";
+      g("bars").innerHTML = days.map(([k, v], i) => '<div class="bc' + (i === 13 ? " t" : "") + (v ? "" : " z") + '"><div class="col">' + (v ? "<b>" + short(v) + "</b>" : "") + '<i style="height:' + Math.round(v / max * 80) + 'px"></i></div><span>' + Number(k.slice(8)) + "</span></div>").join("");
+    } catch (e) {}
+  };
+  loadChart(); setInterval(loadChart, 120000);
+
 })();
 </script>
 </body>
