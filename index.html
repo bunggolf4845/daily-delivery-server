@@ -453,7 +453,7 @@ async function loadBoard() {
       const nm = document.createElement("div"); nm.className = "pn"; nm.textContent = d.ign + fl(d) + (isMe(d) ? " ⭐" : "");
       const pt = document.createElement("div"); pt.className = "pt";
       const tv = document.createElement("span"); countUp(tv, Number(d.total)); pt.appendChild(tv);
-      const sm = document.createElement("small"); sm.textContent = d.days + " วัน"; pt.appendChild(sm);
+      const sm = document.createElement("small"); sm.textContent = "ส่งมา " + d.days + " วัน"; pt.appendChild(sm);
       pt.appendChild(meter(Number(d.total) / max));
       const bar = document.createElement("div"); bar.className = "bar"; bar.textContent = medal[i];
       w.append(nm, pt, bar); $("pod").appendChild(w);
@@ -464,7 +464,7 @@ async function loadBoard() {
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.ign + fl(d) + (isMe(d) ? " ⭐ (คุณ)" : "");
       const tt = document.createElement("span"); tt.className = "tt";
       const b = document.createElement("b"); countUp(b, Number(d.total));
-      const sm = document.createElement("small"); sm.textContent = d.days + " วัน";
+      const sm = document.createElement("small"); sm.textContent = "ส่งมา " + d.days + " วัน";
       tt.append(b, sm);
       const mid = document.createElement("div"); mid.className = "mid"; mid.append(nm, meter(Number(d.total) / max));
       li.append(rk, mid, tt); rows.appendChild(li);
