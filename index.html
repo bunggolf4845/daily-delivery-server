@@ -690,7 +690,8 @@ $("send").addEventListener("click", async () => {
   // 8) อันดับตามหมวดหมู่ (ตามเดือนที่เลือกในอันดับหลัก)
   let typeRows = [], selType = null, typeLabel = "";
   const renderTypes = () => {
-    const types = [...new Set(typeRows.map(r => r.type))];
+    const allowed = [...g("type").options].map(o => o.value);
+    const types = [...new Set(typeRows.map(r => r.type))].filter(t => !allowed.length || allowed.includes(t)).sort((x, y) => allowed.indexOf(x) - allowed.indexOf(y));
     g("typeCard").hidden = !types.length; if (!types.length) return;
     if (!types.includes(selType)) selType = types[0];
     g("typeTabs").innerHTML = types.map(t => '<button type="button" class="tb' + (t === selType ? " on" : "") + '" data-t="' + esc(t) + '">' + styleFor(t).icon + " " + esc(t) + "</button>").join("");
