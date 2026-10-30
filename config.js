@@ -8,5 +8,5 @@ window.APP_CONFIG = {
   supabaseKey: "sb_publishable_Ql5mNOskMzsvrCnCay6GLw_8O5RiITq",
 
   // 3) รายการประเภทของ แก้ไข เพิ่ม ลบ ได้ตามเกมของคุณ
-  itemTypes: ["แร่", "กำมะถัน".]
+  itemTypes: ["แร่", "กำมะถัน"]
 };
