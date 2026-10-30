@@ -251,28 +251,10 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
 .hist .more:hover{background:#17130b;border-color:var(--gold)}
 .hist .more[hidden]{display:none}
 
-/* ===== v5: ปฏิทินการส่ง + แชร์รูปอันดับ ===== */
+/* ===== v5: แชร์รูปอันดับ ===== */
 .share{margin:0 0 14px;padding:11px;font-size:.92rem;color:var(--gold-hi);background:#0a0a0a;border:1px solid rgba(242,180,43,.5);box-shadow:none;border-radius:12px;transition:background .2s,border-color .2s}
 .share:hover{background:#17130b;border-color:var(--gold)}
 .share[hidden]{display:none}
-.calnav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
-.calnav b{font-family:"Kanit","Prompt",sans-serif;font-style:italic;font-weight:800;color:var(--ink)}
-.calnav button{width:40px;height:40px;padding:0;font-size:1.3rem;line-height:1;color:var(--gold-hi);background:#0a0a0a;border:1px solid var(--line);border-radius:50%;box-shadow:none}
-.calnav button:disabled{opacity:.3;cursor:default}
-.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-.calgrid[hidden]{display:none}
-.cwd{margin-bottom:6px}
-.cwd span{text-align:center;font-size:.72rem;color:var(--mute)}
-.cd{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border-radius:10px;border:1px solid #2a2316;background:#0d0c0a;color:var(--mute);font-size:.85rem;-webkit-tap-highlight-color:transparent}
-.cd small{font-size:.58rem;line-height:1}
-.cd.blank{border:0;background:none}
-.cd.miss{color:#5d584c}
-.cd.future{opacity:.3}
-.cd.sent{cursor:pointer;color:#1b1205;font-weight:700;border-color:transparent;background:linear-gradient(180deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));box-shadow:0 0 10px rgba(242,180,43,.35)}
-.cd.today{outline:2px solid var(--gold-hi);outline-offset:1px}
-.cd.today.todo{color:var(--gold-hi);animation:ring 2s ease-in-out infinite alternate}
-.cd.sel{transform:scale(1.08)}
-.calnote{margin:10px 0 0;min-height:1.3em;font-size:.85rem;color:var(--mute);text-align:center}
 .shov{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;background:rgba(0,0,0,.84);animation:up .25s ease-out both}
 .shbox{width:100%;max-width:420px;text-align:center}
 .shbox img{display:block;width:100%;max-height:68vh;object-fit:contain;border-radius:14px;border:1px solid var(--gold);box-shadow:0 0 30px rgba(242,180,43,.4)}
@@ -346,14 +328,6 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
   </section>
   </div>
   <div class="view" data-view="hist">
-  <section class="card hist" id="calCard">
-    <h2>🗓️ ปฏิทินการส่งของฉัน</h2>
-    <div class="calnav"><button type="button" id="calPrev" aria-label="เดือนก่อนหน้า">‹</button><b id="calTitle"></b><button type="button" id="calNext" aria-label="เดือนถัดไป" disabled>›</button></div>
-    <p class="hsum" id="calSum" hidden></p>
-    <div class="calgrid cwd" id="calHead"><span>อา</span><span>จ</span><span>อ</span><span>พ</span><span>พฤ</span><span>ศ</span><span>ส</span></div>
-    <div class="calgrid" id="calGrid"></div>
-    <p class="calnote" id="calNote"></p>
-  </section>
   <section class="card hist" id="chartCard" hidden>
     <h2>📈 ยอดส่งรายวัน</h2>
     <p class="hsum" id="chartSum"></p>
@@ -924,74 +898,10 @@ $("send").addEventListener("click", async () => {
 })();
 </script>
 <script>
-// ===== ปฏิทินการส่งของฉัน + แชร์รูปอันดับ =====
+// ===== แชร์รูปอันดับ =====
 (function () {
   const g = id => document.getElementById(id);
   const main = document.querySelector("main");
-  const pad = n => String(n).padStart(2, "0");
-  const short = v => v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + "k" : String(v);
-  const todayK = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
-  const thDay = k => new Date(k + "T12:00:00+07:00").toLocaleDateString("th-TH", { day: "numeric", month: "long" });
-
-  // ---------- ปฏิทิน ----------
-  let off = 0, token = 0, cache = new Map(), cacheFor = "";
-  const myNames = () => {
-    const me = (savedNames().ign || "").trim().toLowerCase(), s = new Set();
-    if (!me) return s; s.add(me);
-    Object.keys(ALIASES).forEach(k => { const a = k.toLowerCase(), b = String(ALIASES[k]).toLowerCase(); if (me === a || me === b) { s.add(a); s.add(b); } });
-    return s;
-  };
-  async function fetchDay(k, set, isToday) {
-    if (!isToday && cache.has(k)) return cache.get(k);
-    try {
-      const rows = (await rpc("deliveries_on", { p_day: k })) || [];
-      const items = rows.filter(r => set.has(String(r.ign).toLowerCase())).map(r => ({ type: r.type || "", qty: Number(r.qty) || 0 }));
-      const v = { sent: items.length > 0, items, qty: items.reduce((t, x) => t + x.qty, 0) };
-      if (!isToday) cache.set(k, v);
-      return v;
-    } catch (e) { return null; }
-  }
-  async function loadCal() {
-    const my = ++token, me = (savedNames().ign || "").trim(), set = myNames(), mo = bkkMonth(off);
-    if (cacheFor !== me.toLowerCase()) { cache = new Map(); cacheFor = me.toLowerCase(); }
-    g("calTitle").textContent = mo.label; g("calNext").disabled = off >= 0; g("calPrev").disabled = off <= -12;
-    const grid = g("calGrid"), head = g("calHead"), note = g("calNote");
-    if (!me) { grid.hidden = head.hidden = true; g("calSum").hidden = true; note.textContent = "ส่งของครั้งแรกเพื่อบันทึกชื่อ แล้วปฏิทินของคุณจะแสดงที่นี่"; return; }
-    grid.hidden = head.hidden = false; g("calSum").hidden = false; note.textContent = "";
-    const [y, m] = mo.key.split("-").map(Number), dim = new Date(Date.UTC(y, m, 0)).getUTCDate(), first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), tk = todayK();
-    const keys = Array.from({ length: dim }, (_, i) => y + "-" + pad(m) + "-" + pad(i + 1));
-    const st = {};
-    keys.forEach(k => { if (k <= tk) { let loc = false; try { loc = !!localStorage.getItem("delivered:" + k + ":" + me.toLowerCase()); } catch (e) {} st[k] = { sent: loc, items: [], qty: 0 }; } });
-    let sel = null;
-    const paint = () => {
-      let h = "", sent = 0, past = 0, total = 0, run = 0, best = 0;
-      for (let i = 0; i < first; i++) h += '<div class="cd blank"></div>';
-      keys.forEach((k, i) => {
-        const s = st[k], d = i + 1;
-        if (!s) { h += '<div class="cd future"><span>' + d + "</span></div>"; return; }
-        past++; if (s.sent) { sent++; total += s.qty; run++; best = Math.max(best, run); } else run = 0;
-        const cls = "cd" + (s.sent ? " sent" : k === tk ? "" : " miss") + (k === tk ? " today" + (s.sent ? "" : " todo") : "") + (k === sel ? " sel" : "");
-        h += '<div class="' + cls + '" data-k="' + k + '"><span>' + d + "</span>" + (s.sent && s.qty ? "<small>" + short(s.qty) + "</small>" : "") + "</div>";
-      });
-      grid.innerHTML = h;
-      g("calSum").textContent = "ส่งแล้ว " + sent + " จาก " + past + " วัน" + (total ? " · รวม " + total.toLocaleString("en-US") + " ชิ้น" : "") + (best > 1 ? " · ต่อเนื่องสูงสุด " + best + " วัน" : "");
-    };
-    paint();
-    grid.onclick = ev => {
-      const c = ev.target.closest(".cd[data-k]"); if (!c) return; const k = c.dataset.k, s = st[k]; if (!s) return;
-      sel = k; paint();
-      g("calNote").textContent = s.sent ? thDay(k) + " · " + (s.items.length ? s.items.map(x => x.type + " " + x.qty.toLocaleString("en-US") + " ชิ้น").join(", ") : "ส่งแล้ว") : thDay(k) + " · ยังไม่ได้ส่ง";
-    };
-    if (!BOARD_ON) return;
-    await Promise.all(keys.filter(k => k <= tk).map(async k => {
-      const v = await fetchDay(k, set, k === tk); if (my !== token) return;
-      if (v) { st[k] = v; paint(); }
-    }));
-  }
-  g("calPrev").addEventListener("click", () => { off--; loadCal(); });
-  g("calNext").addEventListener("click", () => { if (off < 0) { off++; loadCal(); } });
-  g("nav").addEventListener("click", ev => { const b = ev.target.closest("button"); if (b && b.dataset.v === "hist") { loadCal(); } });
-
   // ---------- แชร์รูปอันดับ ----------
   const W = 1080, H = 1350, EMO = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   const rr = (c, x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
