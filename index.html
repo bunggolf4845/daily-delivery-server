@@ -712,7 +712,7 @@ $("send").addEventListener("click", async () => {
   let anchor = g("qty").closest(".field");
   for (let n = 2; n <= Math.min(2, g("type").options.length); n++) {
     const sel = document.createElement("div"); sel.className = "field"; sel.hidden = n > 2;
-    sel.innerHTML = '<label for="xt' + n + '">ประเภทของ <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ' · ไม่บังคับ)</small></label><select id="xt' + n + '"><option value="">— ไม่ส่งหมวดนี้ —</option>' + opts() + "</select>";
+    sel.innerHTML = '<label for="xt' + n + '">ประเภทของ <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ' · ไม่บังคับ)</small></label><select id="xt' + n + '"><option value="">เลือกส่ง2รายการ</option>' + opts() + "</select>";
     const qf = document.createElement("div"); qf.className = "field"; qf.hidden = true;
     qf.innerHTML = '<label for="xq' + n + '">จำนวนชิ้น <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ')</small></label><input type="number" id="xq' + n + '" min="1" max="99999" step="1" inputmode="numeric" placeholder="เช่น 20">';
     anchor.after(sel); sel.after(qf); anchor = qf;
