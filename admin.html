@@ -14,6 +14,9 @@ h1{font-size:1.3rem;color:var(--hi);margin:6px 0 14px}
 h2{font-size:1rem;color:var(--hi);margin:0 0 10px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
 input{width:100%;padding:12px;margin:0 0 8px;border-radius:10px;border:1px solid var(--line);background:#080808;color:var(--txt);font-size:1rem}
+select{width:100%;padding:12px;margin:0 0 8px;border-radius:10px;border:1px solid var(--line);background:#080808;color:var(--txt);font-size:1rem}
+label{display:block;font-size:.85rem;color:var(--mute);margin:6px 0 4px}
+#editBox{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 button{padding:11px 14px;border:0;border-radius:10px;background:linear-gradient(180deg,var(--hi),var(--gold));color:#1a1405;font-weight:700;font-size:.95rem}
 button.sec{background:#221d10;color:var(--hi);border:1px solid var(--line)}
 button.edt{background:#221d10;color:var(--hi);border:1px solid var(--line);padding:7px 10px;font-size:.8rem}
@@ -60,6 +63,16 @@ li small{display:block;color:var(--mute);font-size:.75rem;margin-top:2px}
     </section>
   </div>
 </main>
+<div id="editBox" hidden>
+  <div class="card" style="width:100%;max-width:420px;margin:0">
+    <h2 id="editTitle">แก้ไขรายการ</h2>
+    <label for="editType">หมวดหมู่ (ประเภทของ)</label>
+    <select id="editType"></select>
+    <label for="editQty">จำนวนชิ้น</label>
+    <input id="editQty" type="number" min="1" max="99999" step="1" inputmode="numeric">
+    <div class="row"><button id="editSave">บันทึก</button><button class="sec" id="editCancel">ยกเลิก</button></div>
+  </div>
+</div>
 <script>
 const CFG = window.APP_CONFIG || {};
 const URL_ = (CFG.supabaseUrl || "").replace(/\/+$/, ""), KEY = CFG.supabaseKey || "";
@@ -77,7 +90,7 @@ async function rpc(name, args) {
 const pick = (r, ks) => { for (const k of ks) if (r[k] != null && r[k] !== "") return r[k]; return ""; };
 async function load() {
   const rows = await rpc("admin_list", { p_pass: PASS, p_limit: 50 });
-  $("list").innerHTML = (rows || []).map(r => "<li><span><b>" + esc(r.ign) + "</b> · " + esc(pick(r, ["item_type", "type"])) + " · " + Number(pick(r, ["qty", "quantity", "amount"]) || 0).toLocaleString("en-US") + " ชิ้น<small>#" + r.id + " · " + esc(r.day) + " · Discord: " + esc(r.dc) + "</small></span><span class='btns'><button class='edt' data-id='" + r.id + "' data-q='" + Number(pick(r, ["qty", "quantity", "amount"]) || 0) + "'>แก้</button><button class='del' data-id='" + r.id + "'>ลบ</button></span></li>").join("") || "<li>ยังไม่มีรายการ</li>";
+  $("list").innerHTML = (rows || []).map(r => "<li><span><b>" + esc(r.ign) + "</b> · " + esc(pick(r, ["item_type", "type"])) + " · " + Number(pick(r, ["qty", "quantity", "amount"]) || 0).toLocaleString("en-US") + " ชิ้น<small>#" + r.id + " · " + esc(r.day) + " · Discord: " + esc(r.dc) + "</small></span><span class='btns'><button class='edt' data-id='" + r.id + "' data-q='" + Number(pick(r, ["qty", "quantity", "amount"]) || 0) + "' data-t='" + esc(pick(r, ["item_type", "type"])).replace(/'/g, "&#39;") + "'>แก้</button><button class='del' data-id='" + r.id + "'>ลบ</button></span></li>").join("") || "<li>ยังไม่มีรายการ</li>";
 }
 async function enter(auto) {
   PASS = $("pass").value.trim(); if (!PASS) return;
@@ -96,16 +109,29 @@ $("pass").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
 $("list").addEventListener("click", async e => {
   const eb = e.target.closest("button.edt");
   if (eb) {
-    const v = prompt("จำนวนใหม่ของรายการ #" + eb.dataset.id + " (เดิม " + eb.dataset.q + " ชิ้น)", eb.dataset.q);
-    if (v === null) return;
-    const q = parseInt(v, 10); if (!(q >= 1 && q <= 99999)) return say("จำนวนต้องเป็นตัวเลข 1 ถึง 99,999", "err");
-    try { await rpc("admin_set_qty", { p_pass: PASS, p_id: Number(eb.dataset.id), p_qty: q }); say("แก้จำนวนแล้ว", "ok"); await load(); } catch (e3) { say("แก้ไม่สำเร็จ (ยังไม่ได้รัน SQL ของฟังก์ชันแก้จำนวนหรือเปล่า)", "err"); }
+    const types = (CFG.itemTypes && CFG.itemTypes.length ? CFG.itemTypes : ["แร่", "กำมะถัน"]).slice(), cur = eb.dataset.t || "";
+    if (cur && !types.includes(cur)) types.push(cur);
+    $("editType").innerHTML = types.map(t => "<option value=\"" + esc(t) + "\"" + (t === cur ? " selected" : "") + ">" + esc(t) + (t === cur && !(CFG.itemTypes || []).includes(t) ? " (หมวดเดิม)" : "") + "</option>").join("");
+    $("editQty").value = eb.dataset.q; $("editTitle").textContent = "แก้ไขรายการ #" + eb.dataset.id;
+    $("editBox").dataset.id = eb.dataset.id; $("editBox").hidden = false;
     return;
   }
   const b = e.target.closest("button.del"); if (!b) return;
   if (!confirm("ลบรายการ #" + b.dataset.id + " ?")) return;
   try { await rpc("admin_delete", { p_pass: PASS, p_id: Number(b.dataset.id) }); say("ลบแล้ว", "ok"); await load(); } catch (e2) { say("ลบไม่สำเร็จ", "err"); }
 });
+$("editCancel").onclick = () => { $("editBox").hidden = true; };
+$("editSave").onclick = async () => {
+  const q = parseInt($("editQty").value, 10), t = $("editType").value;
+  if (!(q >= 1 && q <= 99999)) return say("จำนวนต้องเป็นตัวเลข 1 ถึง 99,999", "err");
+  try {
+    await rpc("admin_update_row", { p_pass: PASS, p_id: Number($("editBox").dataset.id), p_type: t, p_qty: q });
+    $("editBox").hidden = true; say("แก้ไขแล้ว", "ok"); await load();
+  } catch (e) {
+    $("editBox").hidden = true;
+    say(e.message === "db 409" ? "แก้ไม่ได้: คนนี้มีรายการหมวดนี้ในวันเดียวกันอยู่แล้ว" : e.message === "db 404" ? "ไม่พบฟังก์ชัน admin_update_row ใน Supabase (ยังไม่ได้รัน SQL)" : "แก้ไม่สำเร็จ (" + e.message + ")", "err");
+  }
+};
 $("ren").onclick = async () => {
   const f = $("from").value.trim(), t = $("to").value.trim(); if (!f || !t) return say("กรอกให้ครบทั้งสองช่อง", "err");
   if (!confirm("รวมชื่อ “" + f + "” เป็น “" + t + "” ?")) return;
