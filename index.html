@@ -260,7 +260,7 @@ const CFG = window.APP_CONFIG || {};
 const WEBHOOK_URL = CFG.webhookUrl || "PASTE_YOUR_DISCORD_WEBHOOK_URL_HERE";
 const SUPABASE_URL = CFG.supabaseUrl || "PASTE_YOUR_SUPABASE_URL_HERE";
 const SUPABASE_KEY = CFG.supabaseKey || "PASTE_YOUR_SUPABASE_KEY_HERE";
-const ITEM_TYPES = CFG.itemTypes || ["แร่", "กำมะถัน", "อื่นๆ"];
+const ITEM_TYPES = CFG.itemTypes || ["แร่", "กำมะถัน"];
 
 const $ = id => document.getElementById(id);
 ITEM_TYPES.forEach(t => { const o = document.createElement("option"); o.value = o.textContent = t; $("type").appendChild(o); });
@@ -705,23 +705,41 @@ $("send").addEventListener("click", async () => {
   };
   g("typeTabs").addEventListener("click", ev => { const b = ev.target.closest("button.tb"); if (!b) return; selType = b.dataset.t; renderTypes(); });
   { const mo = bkkMonth(boardOffset); window.loadTypeBoard(mo.key, mo.label); }
-  // 9) ส่งหลายหมวดในครั้งเดียว
-  const ex = document.createElement("div"); ex.id = "extra"; g("qtyfmt").after(ex);
-  const addBtn = document.createElement("button"); addBtn.type = "button"; addBtn.className = "addcat"; addBtn.textContent = "+ เพิ่มหมวด"; ex.after(addBtn);
-  const maxExtra = () => Math.min(2, g("type").options.length - 1);
-  const used = () => [g("type").value, ...[...ex.querySelectorAll("select")].map(x => x.value)];
-  const syncAdd = () => { addBtn.hidden = ex.children.length >= maxExtra(); };
-  addBtn.addEventListener("click", () => {
-    if (ex.children.length >= maxExtra()) return;
-    const free = [...g("type").options].map(o => o.value).find(v => !used().includes(v)) || g("type").options[0].value;
-    const row = document.createElement("div"); row.className = "xr";
-    row.innerHTML = "<select>" + [...g("type").options].map(o => '<option value="' + esc(o.value) + '"' + (o.value === free ? " selected" : "") + ">" + esc(o.textContent) + "</option>").join("") + '</select><input type="number" min="1" max="99999" step="1" inputmode="numeric" placeholder="จำนวน"><button type="button" class="rm" aria-label="ลบแถว">✕</button>';
-    ex.appendChild(row); syncAdd(); row.querySelector("input").focus();
-  });
-  ex.addEventListener("click", e => { if (e.target.closest(".rm")) { e.target.closest(".xr").remove(); syncAdd(); } });
-  window.getExtraItems = () => [...ex.querySelectorAll(".xr")].map(r => ({ type: r.querySelector("select").value, qty: parseInt(r.querySelector("input").value, 10) }));
-  window.clearExtra = () => { ex.innerHTML = ""; syncAdd(); };
-  syncAdd();
+  // 9) ส่งหลายหมวดในครั้งเดียว: ช่องประเภท/จำนวนของหมวดที่ 2 และ 3 หน้าตาเหมือนช่องหลัก
+  const opts = () => [...g("type").options].map(o => '<option value="' + esc(o.value) + '">' + esc(o.textContent) + "</option>").join("");
+  const blocks = [];
+  let anchor = g("qty").closest(".field");
+  for (let n = 2; n <= Math.min(2, g("type").options.length); n++) {
+    const sel = document.createElement("div"); sel.className = "field"; sel.hidden = n > 2;
+    sel.innerHTML = '<label for="xt' + n + '">ประเภทของ <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ' · ไม่บังคับ)</small></label><select id="xt' + n + '"><option value="">— ไม่ส่งหมวดนี้ —</option>' + opts() + "</select>";
+    const qf = document.createElement("div"); qf.className = "field"; qf.hidden = true;
+    qf.innerHTML = '<label for="xq' + n + '">จำนวนชิ้น <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ')</small></label><input type="number" id="xq' + n + '" min="1" max="99999" step="1" inputmode="numeric" placeholder="เช่น 20">';
+    anchor.after(sel); sel.after(qf); anchor = qf;
+    const q = qf.querySelector("input"), ch = document.createElement("div"), fm = document.createElement("div");
+    ch.className = "chips"; fm.className = "qtyfmt";
+    [[1000, "+1,000"], [2000, "+2,000"], [5000, "+5,000"], [10000, "+10,000"]].forEach(([k, t]) => {
+      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = t;
+      bt.addEventListener("click", () => { q.value = Math.min(99999, (parseInt(q.value, 10) || 0) + k); q.dispatchEvent(new Event("input")); });
+      ch.appendChild(bt);
+    });
+    const cl = document.createElement("button"); cl.type = "button"; cl.className = "x"; cl.textContent = "ล้าง";
+    cl.addEventListener("click", () => { q.value = ""; q.dispatchEvent(new Event("input")); }); ch.appendChild(cl);
+    q.addEventListener("input", () => { const v = parseInt(q.value, 10); fm.textContent = v > 0 ? "= " + v.toLocaleString("en-US") + " ชิ้น" : ""; });
+    qf.append(ch, fm);
+    blocks.push({ sel, qf, s: sel.querySelector("select"), q });
+  }
+  const syncX = () => {
+    const picked = [g("type").value, ...blocks.map(b => b.s.value)];
+    [g("type"), ...blocks.map(b => b.s)].forEach(el => [...el.options].forEach(o => { o.disabled = !!o.value && o.value !== el.value && picked.includes(o.value); }));
+    blocks.forEach((b, i) => {
+      b.qf.hidden = !b.s.value;
+      if (i > 0) { b.sel.hidden = !blocks[i - 1].s.value; if (b.sel.hidden) { b.s.value = ""; b.qf.hidden = true; } }
+    });
+  };
+  [g("type"), ...blocks.map(b => b.s)].forEach(el => el.addEventListener("change", syncX));
+  window.getExtraItems = () => blocks.filter(b => b.s.value).map(b => ({ type: b.s.value, qty: parseInt(b.q.value, 10) }));
+  window.clearExtra = () => { blocks.forEach(b => { b.s.value = ""; b.q.value = ""; b.q.dispatchEvent(new Event("input")); }); syncX(); };
+  syncX();
   try { postLastMonthSummary(); } catch (e) {}
   // 6) ชื่อแนะนำตอนพิมพ์ (จากอันดับเดือนนี้และเดือนที่แล้ว)
   const dl = document.createElement("datalist"); dl.id = "ignList"; document.body.appendChild(dl); g("ign").setAttribute("list", "ignList");
