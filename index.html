@@ -352,10 +352,10 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
 <script>
 // ค่าตั้งต่างๆ อ่านจากไฟล์ config.js (แก้ที่ไฟล์นั้น ไม่ต้องแก้ไฟล์นี้)
 const CFG = window.APP_CONFIG || {};
-const WEBHOOK_URL = CFG.webhookUrl || "PASTE_YOUR_DISCORD_WEBHOOK_URL_HERE";
 const SUPABASE_URL = CFG.supabaseUrl || "PASTE_YOUR_SUPABASE_URL_HERE";
 const SUPABASE_KEY = CFG.supabaseKey || "PASTE_YOUR_SUPABASE_KEY_HERE";
 const ITEM_TYPES = CFG.itemTypes || ["แร่", "กำมะถัน"];
+const STORAGE_BUCKET = "delivery-photos"; // เก็บรูปแนบ ก่อนส่งลิงก์เข้า Discord (ไม่ใช่ webhook URL แล้ว)
 
 const $ = id => document.getElementById(id);
 ITEM_TYPES.forEach(t => { const o = document.createElement("option"); o.value = o.textContent = t; $("type").appendChild(o); });
@@ -487,6 +487,16 @@ async function rpc(name, args) {
   const t = await r.text();
   return t ? JSON.parse(t) : null;
 }
+// อัปโหลดรูปขึ้น Supabase Storage แล้วคืนลิงก์สาธารณะ (แทนการแนบไฟล์ตรงเข้า Discord)
+async function uploadToStorage(blob, path) {
+  const h = { apikey: SUPABASE_KEY, "Content-Type": blob.type || "application/octet-stream" };
+  if (!SUPABASE_KEY.startsWith("sb_")) h.Authorization = "Bearer " + SUPABASE_KEY;
+  const url = SUPABASE_URL.replace(/\/+$/, "") + "/storage/v1/object/" + STORAGE_BUCKET + "/" + path;
+  const r = await fetch(url, { method: "POST", headers: h, body: blob });
+  if (!r.ok) throw userErr("อัปโหลดรูปไม่สำเร็จ (" + r.status + ") ลองใหม่อีกครั้ง");
+  return SUPABASE_URL.replace(/\/+$/, "") + "/storage/v1/object/public/" + STORAGE_BUCKET + "/" + path;
+}
+const uploadPics = (blobs, paths) => Promise.all(blobs.map((b, i) => uploadToStorage(b, paths[i])));
 const bkkMonth = offset => { // คืนค่า {key:"2026-10", label:"ตุลาคม 2569"} ตามเวลาไทย
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit" }).formatToParts(new Date());
   let y = +parts.find(p => p.type === "year").value, m = +parts.find(p => p.type === "month").value + offset;
@@ -501,7 +511,7 @@ async function loadStreaks() {
   try { const a = await rpc("get_streaks"); STREAKS = {}; (a || []).forEach(x => { STREAKS[String(x.k).toLowerCase()] = x.n; }); } catch (e) {}
 }
 const fl = d => { const n = STREAKS[String(d.ign).toLowerCase()]; return n ? " 🔥" + n : ""; };
-const hook = embed => fetch(WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [embed] }) });
+const hook = embed => rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [embed] } }).catch(() => {});
 async function topNow() { try { return mergeAliases(await rpc("leaderboard", { p_month: bkkMonth(0).key }))[0] || null; } catch (e) { return null; } }
 async function announceTop(before, ign) {
   try {
@@ -512,7 +522,7 @@ async function announceTop(before, ign) {
   } catch (e) {}
 }
 async function postLastMonthSummary() {
-  if (!BOARD_ON || WEBHOOK_URL.startsWith("PASTE_")) return;
+  if (!BOARD_ON) return;
   const mo = bkkMonth(-1);
   try {
     if ((await rpc("claim_month_post", { p_month: mo.key })) !== true) return;
@@ -637,7 +647,7 @@ $("send").addEventListener("click", async () => {
   const key = todayKey(ign);
   if (!BOARD_ON && alreadySent(key)) return msg("วันนี้ส่งของในชื่อ “" + ign + "” ไปแล้ว พรุ่งนี้ส่งได้ใหม่", "err");
   if (!pics.length) return msg("กรุณาแนบรูปอย่างน้อย 1 รูป", "err");
-  if (WEBHOOK_URL.startsWith("PASTE_")) return msg("ยังไม่ได้ตั้งค่า Webhook URL ในไฟล์ config.js", "err");
+  if (!BOARD_ON) return msg("ระบบยังไม่ได้เชื่อมต่อฐานข้อมูล Supabase กรุณาตั้งค่า config.js", "err");
 
   $("send").disabled = true;
   msg("กำลังเตรียมรูป...");
@@ -645,9 +655,7 @@ $("send").addEventListener("click", async () => {
   try {
     const blobs = await Promise.all(pics.map(shrink));
     if (blobs.some(x => x.size > 8 * 1024 * 1024)) throw userErr("รูปใหญ่เกิน 8 MB กรุณาเลือกรูปที่เล็กกว่านี้");
-    const names = blobs.map((x, i) => "photo" + (i + 1) + "." + (EXT[x.type] || "jpg"));
     const date = new Date().toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
-    const gal = blobs.length > 1 ? "https://discord.com" : undefined; // embed ที่ url เดียวกันจะรวมเป็นแกลเลอรี
     const sty = multi ? { icon: "🧺", color: 0xF2B42B } : styleFor(type), big = total >= 10000, same = String(dc).trim().toLowerCase() === String(ign).trim().toLowerCase();
     const fields = [{ name: "👤 ชื่อในเกม", value: "**" + ign + "**", inline: true }];
     if (!multi) {
@@ -657,24 +665,26 @@ $("send").addEventListener("click", async () => {
       fields.push({ name: "📊 รวม", value: "**" + total.toLocaleString("th-TH") + "** ชิ้น", inline: true });
     }
     if (!same) fields.push({ name: "💬 Discord", value: dc, inline: true });
-    const embeds = [{
-      title: (big ? "🔥 " : "") + sty.icon + " ส่งของรายวัน" + (big ? " · ยอดใหญ่!" : ""), color: sty.color, url: gal,
-      fields, timestamp: new Date().toISOString(), footer: { text: "Rockman · ส่งของรายวัน" },
-      image: { url: "attachment://" + names[0] }
-    }];
-    for (let i = 1; i < blobs.length; i++) embeds.push({ url: gal, image: { url: "attachment://" + names[i] } });
-    const fd = new FormData();
-    fd.append("payload_json", JSON.stringify({ username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds }));
-    blobs.forEach((x, i) => fd.append("files[" + i + "]", x, names[i]));
-    msg("กำลังส่ง...");
+
     if (BOARD_ON) {
       let sentToday = false;
       try { sentToday = await rpc("already_sent", { p_ign: ign }); } catch (e) { throw userErr("เชื่อมต่อฐานข้อมูลไม่ได้ ลองใหม่อีกครั้ง"); }
       if (sentToday) throw userErr("วันนี้ส่งของในชื่อ “" + ign + "” ไปแล้ว พรุ่งนี้ส่งได้ใหม่");
     }
-    const r = await fetch(WEBHOOK_URL, { method: "POST", body: fd });
-    if (r.status === 429) throw new Error("Discord จำกัดการส่งชั่วคราว กรุณารอสักครู่แล้วลองใหม่");
-    if (!r.ok) throw new Error("ผิดพลาด " + r.status);
+
+    msg("กำลังอัปโหลดรูป...");
+    const paths = blobs.map((x, i) => Date.now() + "-" + i + "-" + Math.random().toString(36).slice(2, 8) + "." + (EXT[x.type] || "jpg"));
+    const urls = await uploadPics(blobs, paths);
+    const gal = urls.length > 1 ? "https://discord.com" : undefined; // embed ที่ url เดียวกันจะรวมเป็นแกลเลอรี
+    const embeds = [{
+      title: (big ? "🔥 " : "") + sty.icon + " ส่งของรายวัน" + (big ? " · ยอดใหญ่!" : ""), color: sty.color, url: gal,
+      fields, timestamp: new Date().toISOString(), footer: { text: "Rockman · ส่งของรายวัน" },
+      image: { url: urls[0] }
+    }];
+    for (let i = 1; i < urls.length; i++) embeds.push({ url: gal, image: { url: urls[i] } });
+
+    msg("กำลังส่ง...");
+    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds } });
     markSent(key); saveNames(dc, ign); setToday(true); try { window.logHist(ign, type, total); } catch (e) {}
     if (BOARD_ON) {
       const topB = await topNow();
