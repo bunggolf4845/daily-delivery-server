@@ -247,6 +247,9 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
 .nav button.on .ni svg{width:28px;height:28px}
 .nav button:not(.on):active .ni{transform:scale(.88)}
 .nav button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:14px}
+.hist .more{margin-top:12px;padding:11px;font-size:.9rem;color:var(--gold-hi);background:#0a0a0a;border:1px dashed #6b5428;border-radius:12px;box-shadow:none;transition:background .2s,border-color .2s}
+.hist .more:hover{background:#17130b;border-color:var(--gold)}
+.hist .more[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -322,6 +325,7 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
     <h2>📜 รายการส่งล่าสุดของทุกคน</h2>
     <p class="hsum" id="hsum"></p>
     <ul id="hlist"></ul>
+    <button type="button" class="more" id="hmore" hidden></button>
   </section>
   </div>
   <p class="ft">Rockman · ส่งของรายวัน</p>
@@ -748,11 +752,14 @@ $("send").addEventListener("click", async () => {
     if (m < 1440) return Math.floor(m / 60) + " ชั่วโมงที่แล้ว";
     return new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
   };
-  let recent = [];
+  let recent = [], shown = 20;
+  const PAGE = 20;
   const renderRecent = () => {
     g("histCard").hidden = !recent.length; if (!recent.length) return;
-    g("hsum").textContent = "ล่าสุด " + recent.length + " รายการ";
-    g("hlist").innerHTML = recent.map(r => {
+    const vis = recent.slice(0, shown), left = recent.length - vis.length;
+    g("hsum").textContent = "ล่าสุด " + vis.length + (left > 0 ? " จาก " + recent.length : "") + " รายการ";
+    g("hmore").hidden = left <= 0; g("hmore").textContent = "ดูเพิ่ม (เหลืออีก " + left + " รายการ) ▾";
+    g("hlist").innerHTML = vis.map(r => {
       const t = pick(r, ["created_at", "inserted_at", "sent_at", "ts", "time", "created"]) || r.day;
       const q = Number(pick(r, ["qty", "quantity", "amount", "total"])) || 0;
       const ty = pick(r, ["item_type", "type"]) || "";
@@ -761,8 +768,9 @@ $("send").addEventListener("click", async () => {
   };
   const loadRecent = async () => {
     if (!BOARD_ON) return;
-    try { const d = await rpc("recent_deliveries", { p_limit: 20 }); recent = Array.isArray(d) ? d : []; renderRecent(); } catch (e) {}
+    try { const d = await rpc("recent_deliveries", { p_limit: 100 }); recent = Array.isArray(d) ? d : []; renderRecent(); } catch (e) {}
   };
+  g("hmore").addEventListener("click", () => { shown += PAGE; renderRecent(); });
   window.logHist = () => { loadRecent(); setTimeout(() => { try { loadChart(); } catch (e) {} }, 1500); };
   loadRecent(); setInterval(loadRecent, 60000); setInterval(renderRecent, 30000);
   g("send").addEventListener("click", () => buzz(20));
