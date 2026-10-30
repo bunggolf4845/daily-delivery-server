@@ -37,7 +37,7 @@ li small{display:block;color:var(--mute);font-size:.75rem;margin-top:2px}
 
   <section class="card" id="login">
     <h2>เข้าสู่ระบบ</h2>
-    <input id="pass" type="password" placeholder="รหัสแอดมิน" autocomplete="current-password">
+    <input id="pass" type="password" placeholder="รหัสแอดมิน" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button id="go">เข้าสู่ระบบ</button>
   </section>
 
@@ -79,10 +79,17 @@ async function load() {
   const rows = await rpc("admin_list", { p_pass: PASS, p_limit: 50 });
   $("list").innerHTML = (rows || []).map(r => "<li><span><b>" + esc(r.ign) + "</b> · " + esc(pick(r, ["item_type", "type"])) + " · " + Number(pick(r, ["qty", "quantity", "amount"]) || 0).toLocaleString("en-US") + " ชิ้น<small>#" + r.id + " · " + esc(r.day) + " · Discord: " + esc(r.dc) + "</small></span><span class='btns'><button class='edt' data-id='" + r.id + "' data-q='" + Number(pick(r, ["qty", "quantity", "amount"]) || 0) + "'>แก้</button><button class='del' data-id='" + r.id + "'>ลบ</button></span></li>").join("") || "<li>ยังไม่มีรายการ</li>";
 }
-async function enter() {
-  PASS = $("pass").value; if (!PASS) return;
+async function enter(auto) {
+  PASS = $("pass").value.trim(); if (!PASS) return;
   try { await load(); sessionStorage.setItem("adm", PASS); $("login").hidden = true; $("panel").hidden = false; say(""); }
-  catch (e) { say("รหัสผิด หรือยังไม่ได้ตั้งค่าฟังก์ชันแอดมินใน Supabase", "err"); }
+  catch (e) {
+    sessionStorage.removeItem("adm"); if (auto) { $("pass").value = ""; return; }
+    const m = String(e.message), c = m.replace("db ", "");
+    say(c === "400" ? "รหัสไม่ถูกต้อง (รหัสไม่ตรงกับในฐานข้อมูล)"
+      : c === "404" ? "ไม่พบฟังก์ชัน admin_list ใน Supabase (ยังไม่ได้รัน SQL ชุดแอดมิน)"
+      : c === "401" || c === "403" ? "ถูกปฏิเสธสิทธิ์ (" + c + ") ตรวจ supabaseKey ใน config.js และสิทธิ์ของฟังก์ชัน"
+      : /^db /.test(m) ? "เกิดข้อผิดพลาดจากฐานข้อมูล (" + c + ")" : "เชื่อมต่อ Supabase ไม่ได้ ตรวจ supabaseUrl ใน config.js (" + m + ")", "err");
+  }
 }
 $("go").onclick = enter;
 $("pass").addEventListener("keydown", e => { if (e.key === "Enter") enter(); });
@@ -116,7 +123,7 @@ $("sum").onclick = async () => {
     say(r.ok ? "โพสต์แล้ว" : "โพสต์ไม่สำเร็จ (" + r.status + ")", r.ok ? "ok" : "err");
   } catch (e) { say("โพสต์ไม่สำเร็จ", "err"); }
 };
-const saved = sessionStorage.getItem("adm"); if (saved) { $("pass").value = saved; enter(); }
+const saved = sessionStorage.getItem("adm"); if (saved) { $("pass").value = saved; enter(true); }
 </script>
 </body>
 </html>
