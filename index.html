@@ -274,11 +274,7 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
   <div class="today" id="today" hidden></div>
   <div class="card">
     <div class="prog" aria-hidden="true"><i id="progBar"></i></div>
-    <p class="progtxt" id="progTxt">กรอกข้อมูลแล้ว 0/5</p>
-    <div class="field">
-      <label for="dc">ชื่อใน Discord</label>
-      <input type="text" id="dc" autocomplete="off" placeholder="เช่น Rockman">
-    </div>
+    <p class="progtxt" id="progTxt">กรอกข้อมูลแล้ว 0/4</p>
     <div class="field">
       <label for="ign">ชื่อในเกม</label>
       <input type="text" id="ign" autocomplete="off" placeholder="เช่น Rockman">
@@ -372,9 +368,9 @@ const msg = (t, c) => { $("msg").textContent = t; $("msg").className = c || ""; 
 // ===== จำชื่อไว้ในเครื่อง =====
 const NK = "rm_names";
 const savedNames = () => { try { return JSON.parse(localStorage.getItem(NK)) || {}; } catch (e) { return {}; } };
-function saveNames(dc, ign) { try { localStorage.setItem(NK, JSON.stringify({ dc, ign })); } catch (e) {} $("forget").hidden = false; }
-(function () { const n = savedNames(); if (n.dc) $("dc").value = n.dc; if (n.ign) $("ign").value = n.ign; $("forget").hidden = !(n.dc || n.ign); })();
-$("forget").addEventListener("click", () => { try { localStorage.removeItem(NK); } catch (e) {} $("dc").value = $("ign").value = ""; $("forget").hidden = true; $("today").hidden = true; loadBoard(); });
+function saveNames(ign) { try { localStorage.setItem(NK, JSON.stringify({ ign })); } catch (e) {} $("forget").hidden = false; }
+(function () { const n = savedNames(); if (n.ign) $("ign").value = n.ign; $("forget").hidden = !n.ign; })();
+$("forget").addEventListener("click", () => { try { localStorage.removeItem(NK); } catch (e) {} $("ign").value = ""; $("forget").hidden = true; $("today").hidden = true; loadBoard(); });
 
 // ===== เอฟเฟกต์ฉลองหลังส่งสำเร็จ =====
 function celebrate(ign, type, qty) {
@@ -636,8 +632,8 @@ async function shrink(f) {
 
 $("send").addEventListener("click", async () => {
   ensureAudio();
-  const dc = $("dc").value.trim(), ign = $("ign").value.trim();
-  if (!dc || !ign) return msg("กรุณากรอกชื่อ Discord และชื่อในเกม", "err");
+  const ign = $("ign").value.trim(), dc = ign;
+  if (!ign) return msg("กรุณากรอกชื่อในเกม", "err");
   const type = $("type").value, qty = parseInt($("qty").value, 10);
   if (!qty || qty < 1) return msg("กรุณากรอกจำนวนชิ้น (อย่างน้อย 1)", "err");
   const extra = window.getExtraItems ? window.getExtraItems() : [];
@@ -685,7 +681,7 @@ $("send").addEventListener("click", async () => {
 
     msg("กำลังส่ง...");
     await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds } });
-    markSent(key); saveNames(dc, ign); setToday(true); try { window.logHist(ign, type, total); } catch (e) {}
+    markSent(key); saveNames(ign); setToday(true); try { window.logHist(ign, type, total); } catch (e) {}
     if (BOARD_ON) {
       const topB = await topNow();
       try { await rpc("add_deliveries", { p_ign: ign, p_dc: dc, p_items: items }); }
@@ -758,14 +754,14 @@ $("send").addEventListener("click", async () => {
   document.addEventListener("paste", ev => { if (ev.clipboardData && ev.clipboardData.files.length) addFiles(ev.clipboardData.files); });
   // 4) แถบความคืบหน้าการกรอก
   const upd = () => {
-    const n = [g("dc").value.trim(), g("ign").value.trim(), g("type").value, parseInt(g("qty").value, 10) > 0, pics.length > 0].filter(Boolean).length;
+    const n = [g("ign").value.trim(), g("type").value, parseInt(g("qty").value, 10) > 0, pics.length > 0].filter(Boolean).length;
     g("progBar").style.width = (n * 20) + "%";
-    g("progTxt").textContent = n === 5 ? "พร้อมส่งแล้ว ✅" : "กรอกข้อมูลแล้ว " + n + "/5";
+    g("progTxt").textContent = n === 4 ? "พร้อมส่งแล้ว ✅" : "กรอกข้อมูลแล้ว " + n + "/4";
     g("progTxt").classList.toggle("full", n === 5);
     const q = parseInt(g("qty").value, 10);
     g("qtyfmt").textContent = q > 0 ? "= " + q.toLocaleString("en-US") + " ชิ้น" : "";
   };
-  ["dc", "ign", "type", "qty"].forEach(i => { g(i).addEventListener("input", upd); g(i).addEventListener("change", upd); });
+  ["ign", "type", "qty"].forEach(i => { g(i).addEventListener("input", upd); g(i).addEventListener("change", upd); });
   new MutationObserver(upd).observe(g("thumbs"), { childList: true });
   setTimeout(upd, 300); setInterval(upd, 1500);
   // 5) รายการส่งล่าสุดของทุกคน (ดึงจาก Supabase)
