@@ -180,6 +180,58 @@ p.sub{line-height:1.5}
 .xr select,.xr input{width:auto;min-width:0;margin:0}
 .xr select{flex:1.3}.xr input{flex:1}
 .xr .rm{flex:0 0 auto;width:46px;padding:0;background:#2a1413;color:#ff8b84;border:1px solid #5a2623;box-shadow:none;border-radius:12px}
+
+/* ===== v3: รีดีไซน์ อันดับ + ประวัติ ===== */
+.board h2,.hist h2{display:flex;align-items:center;justify-content:center;gap:8px}
+.hist h2{justify-content:flex-start;font-family:"Kanit","Prompt",sans-serif;font-style:italic;font-weight:800;font-size:1.2rem;letter-spacing:.3px}
+.board .tabs{padding:4px;border-radius:999px;background:#0a0a0a;border:1px solid var(--line)}
+.board .tabs button{border:0;border-radius:999px;padding:9px 6px;background:transparent;transition:background .25s,color .25s}
+.board .tabs button[aria-pressed=true]{box-shadow:0 0 16px rgba(242,180,43,.45)}
+.mine{border-radius:14px;background:linear-gradient(135deg,rgba(242,180,43,.16),rgba(242,180,43,.04));box-shadow:0 0 22px rgba(242,180,43,.12)}
+/* โพเดียม */
+.pod{gap:6px;padding:18px 6px 0;margin:8px 0 16px;border-radius:14px;background:radial-gradient(ellipse at 50% 100%,rgba(242,180,43,.16),transparent 70%)}
+.pod .p{padding:0 2px}
+.pn{font-size:.9rem;margin-bottom:2px}
+.pt{margin-bottom:8px}
+.pt>span{display:block;font-family:"Kanit","Prompt",sans-serif;font-style:italic;font-weight:800;font-size:1rem;color:var(--gold-hi)}
+.pod .bar{font-size:1.9rem;border-radius:12px 12px 0 0;border:1px solid rgba(255,255,255,.18);border-bottom:0;position:relative}
+.pod .bar::before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(90deg,rgba(255,255,255,.28),transparent 35%,transparent 65%,rgba(0,0,0,.22));pointer-events:none}
+.silver .pt>span{color:#dfe5ea}.bronze .pt>span{color:#f0b07c}
+.p.me .bar{outline:2px solid var(--gold-hi);outline-offset:2px}
+/* แถวอันดับ 4+ */
+.rows li{gap:12px;padding:11px 10px;margin-bottom:8px;border:1px solid #2a2316;border-radius:12px;background:linear-gradient(180deg,#15130f,#0d0c0a)}
+.rows li:last-child{border-bottom:1px solid #2a2316}
+.rows li:hover{border-color:rgba(242,180,43,.45);background:#17130b}
+.rk{width:32px;height:32px;line-height:30px;border-radius:50%;border:1px solid #4a3c20;background:#0a0a0a;color:var(--gold-hi);font-family:"Kanit","Prompt",sans-serif;font-style:italic;font-size:.9rem}
+.rows li .nm{font-weight:600}
+.rows li .meter{height:6px}
+.rows li.me{border-color:rgba(242,180,43,.7);background:linear-gradient(90deg,rgba(242,180,43,.18),rgba(242,180,43,.05))}
+.rows li.me .rk{background:var(--gold);color:#1b1205;border-color:transparent}
+/* แท็บหมวด */
+#typeTabs{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none}
+#typeTabs::-webkit-scrollbar{display:none}
+#typeTabs button{flex:0 0 auto;width:auto;padding:8px 14px;white-space:nowrap}
+#typeTabs button.on{box-shadow:0 0 14px rgba(242,180,43,.45)}
+.hsum{display:inline-block;padding:3px 12px;border-radius:999px;background:rgba(242,180,43,.1);border:1px solid rgba(242,180,43,.25);color:var(--gold-hi);font-size:.78rem}
+/* รายการประวัติ / อันดับตามหมวด / รายละเอียดรายวัน */
+.hist ul{display:flex;flex-direction:column;gap:8px}
+.hist li{align-items:center;gap:12px;padding:10px 12px;border:1px solid #2a2316;border-left:3px solid var(--gold);border-radius:12px;background:linear-gradient(180deg,#15130f,#0d0c0a);animation:up .4s ease-out both;transition:border-color .2s,background .2s}
+.hist li:hover{background:#17130b;border-color:rgba(242,180,43,.5);border-left-color:var(--gold-hi)}
+.hist li>span{flex:1;min-width:0}
+.hist li strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist li small{margin-top:2px}
+.hist li b{padding:4px 10px;border-radius:999px;background:rgba(242,180,43,.12);border:1px solid rgba(242,180,43,.3);font-size:.82rem}
+.hist li .ic,.hist li .rk2{flex:none;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:#0a0a0a;border:1px solid #4a3c20;font-style:normal;font-size:1.2rem;box-shadow:0 0 10px rgba(242,180,43,.12)}
+.hist li .rk2{font-family:"Kanit","Prompt",sans-serif;font-style:italic;font-weight:800;font-size:.95rem;color:var(--gold-hi)}
+.hist li.top1{border-left-color:var(--gold-hi);background:linear-gradient(90deg,rgba(242,180,43,.16),#0d0c0a 70%)}
+.hist li.me{box-shadow:inset 0 0 0 1px rgba(242,180,43,.55)}
+.dd{padding:12px;border-radius:12px;border:1px solid var(--line);background:#0b0a08}
+.dd h3{color:var(--gold-hi);font-family:"Kanit","Prompt",sans-serif;font-style:italic;margin-bottom:8px}
+.dd ul{margin:0;padding:0;list-style:none}
+.dd li{border-top:0}
+.bc{padding:4px 0;border-radius:8px;transition:background .2s}
+.bc:hover{background:rgba(242,180,43,.07)}
+.bc.sel{background:rgba(242,180,43,.12)}
 </style>
 </head>
 <body>
@@ -677,7 +729,8 @@ $("send").addEventListener("click", async () => {
     g("hlist").innerHTML = recent.map(r => {
       const t = pick(r, ["created_at", "inserted_at", "sent_at", "ts", "time", "created"]) || r.day;
       const q = Number(pick(r, ["qty", "quantity", "amount", "total"])) || 0;
-      return "<li><span><strong>" + esc(r.ign) + "</strong><small>" + esc(pick(r, ["item_type", "type"]) || "") + " · " + esc(ago(t)) + "</small></span><b>" + q.toLocaleString("en-US") + " ชิ้น</b></li>";
+      const ty = pick(r, ["item_type", "type"]) || "";
+      return "<li><i class=\"ic\">" + styleFor(ty).icon + "</i><span><strong>" + esc(r.ign) + "</strong><small>" + esc(ty) + " · " + esc(ago(t)) + "</small></span><b>" + q.toLocaleString("en-US") + " ชิ้น</b></li>";
     }).join("");
   };
   const loadRecent = async () => {
@@ -698,7 +751,7 @@ $("send").addEventListener("click", async () => {
     const rows = mergeAliases(typeRows.filter(r => r.type === selType).map(r => ({ ign: r.ign, total: r.total, days: r.days }))).slice(0, 10);
     const me = (savedNames().ign || "").toLowerCase(), md = ["🥇", "🥈", "🥉"], sum = rows.reduce((t, r) => t + r.total, 0);
     g("typeSum").textContent = typeLabel + " · รวม " + sum.toLocaleString("en-US") + " ชิ้น";
-    g("typeList").innerHTML = rows.map((r, i) => "<li><span><strong>" + (md[i] || (i + 1) + ".") + " " + esc(r.ign) + esc(fl(r)) + (String(r.ign).toLowerCase() === me ? " ⭐" : "") + "</strong><small>ส่งมา " + r.days + " วัน</small></span><b>" + r.total.toLocaleString("en-US") + " ชิ้น</b></li>").join("");
+    g("typeList").innerHTML = rows.map((r, i) => "<li class=\"" + (i === 0 ? "top1 " : "") + (String(r.ign).toLowerCase() === me ? "me" : "") + "\"><i class=\"rk2\">" + (md[i] || (i + 1)) + "</i><span><strong>" + esc(r.ign) + esc(fl(r)) + (String(r.ign).toLowerCase() === me ? " ⭐" : "") + "</strong><small>ส่งมา " + r.days + " วัน</small></span><b>" + r.total.toLocaleString("en-US") + " ชิ้น</b></li>").join("");
   };
   window.loadTypeBoard = async (key, label) => {
     if (!BOARD_ON) return; typeLabel = label || "";
@@ -712,7 +765,7 @@ $("send").addEventListener("click", async () => {
   let anchor = g("qty").closest(".field");
   for (let n = 2; n <= Math.min(2, g("type").options.length); n++) {
     const sel = document.createElement("div"); sel.className = "field"; sel.hidden = n > 2;
-    sel.innerHTML = '<label for="xt' + n + '">ประเภทของ <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ' · ไม่บังคับ)</small></label><select id="xt' + n + '"><option value="">เลือกส่ง2รายการ</option>' + opts() + "</select>";
+    sel.innerHTML = '<label for="xt' + n + '">ประเภทของ <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ' · ไม่บังคับ)</small></label><select id="xt' + n + '"><option value="">— ไม่ส่งหมวดนี้ —</option>' + opts() + "</select>";
     const qf = document.createElement("div"); qf.className = "field"; qf.hidden = true;
     qf.innerHTML = '<label for="xq' + n + '">จำนวนชิ้น <small style="color:var(--mute);font-weight:400">(หมวดที่ ' + n + ')</small></label><input type="number" id="xq' + n + '" min="1" max="99999" step="1" inputmode="numeric" placeholder="เช่น 20">';
     anchor.after(sel); sel.after(qf); anchor = qf;
@@ -781,7 +834,7 @@ $("send").addEventListener("click", async () => {
       const rows = await rpc("deliveries_on", { p_day: k }) || [];
       if (!rows.length) { box.innerHTML = "<h3>" + label + "</h3><p>ไม่มีใครส่งในวันนี้</p>"; return; }
       const tot = rows.reduce((t, r) => t + (Number(r.qty) || 0), 0);
-      box.innerHTML = "<h3>" + label + " · " + rows.length + " รายการ · " + tot.toLocaleString("en-US") + " ชิ้น</h3><ul>" + rows.map(r => "<li><span><strong>" + esc(r.ign) + "</strong><small>" + esc(r.type || "") + " · " + new Date(r.at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }) + " น.</small></span><b>" + (Number(r.qty) || 0).toLocaleString("en-US") + " ชิ้น</b></li>").join("") + "</ul>";
+      box.innerHTML = "<h3>" + label + " · " + rows.length + " รายการ · " + tot.toLocaleString("en-US") + " ชิ้น</h3><ul>" + rows.map(r => "<li><i class=\"ic\">" + styleFor(r.type || "").icon + "</i><span><strong>" + esc(r.ign) + "</strong><small>" + esc(r.type || "") + " · " + new Date(r.at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }) + " น.</small></span><b>" + (Number(r.qty) || 0).toLocaleString("en-US") + " ชิ้น</b></li>").join("") + "</ul>";
     } catch (e) { box.innerHTML = "<p>โหลดรายละเอียดไม่สำเร็จ</p>"; }
   });
 
