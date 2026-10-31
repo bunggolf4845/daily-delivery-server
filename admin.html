@@ -315,7 +315,9 @@ function buildEmbeds(r) {
   for (let i = 1; i < urls.length; i++) embeds.push({ url: gal, image: { url: urls[i] } });
   return embeds;
 }
-const LATE_MS = 3 * 3600 * 1000; let PEND = [], pbusy = false, EDITING = false;
+const LATE_MS = 5 * 60 * 1000, REMIND_MS = 30 * 60 * 1000; // ค้างเกิน 5 นาทีถือว่านาน / เตือน Discord ซ้ำได้ทุก 30 นาที
+const waitTxt = ms => { const m = Math.floor(ms / 60000); return m < 60 ? m + " นาที" : Math.floor(m / 60) + " ชม." + (m % 60 ? " " + (m % 60) + " นาที" : ""); };
+ let PEND = [], pbusy = false, EDITING = false;
 const pm = (t, c) => { $("pendMsg").textContent = t || ""; $("pendMsg").className = "pmsg " + (c || ""); };
 async function pcall(name, args) {
   const r = await rpc(name, Object.assign({ p_pass: PASS }, args || {}));
@@ -331,7 +333,7 @@ function pcard(r) {
   (r.items || []).forEach(x => { tot += Number(x.qty) || 0; const d = el("div"); d.append(STY(x.type).icon + " " + x.type + " ", el("b", "", fmt(x.qty) + " ชิ้น")); it.appendChild(d); });
   if ((r.items || []).length > 1) { const d = el("div"); d.append("📊 รวม ", el("b", "", fmt(tot) + " ชิ้น")); it.appendChild(d); }
   c.appendChild(it);
-  if (late) c.appendChild(el("p", "lt", "⏰ รอมานาน " + Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000) + " ชม. — รีบตรวจ"));
+  if (late) c.appendChild(el("p", "lt", "⏰ รอมานาน " + waitTxt(Date.now() - new Date(r.created_at).getTime()) + " — รีบตรวจ"));
   if (r.loc) c.appendChild(el("p", "pl", "📍 ตำแหน่ง: " + r.loc));
   const th = el("div", "pth"), all = (r.photos || []).concat(r.loc_photo ? [r.loc_photo] : []);
   all.forEach((u, i) => {
@@ -388,16 +390,17 @@ async function saveEdit(r, items) {
   catch (e) { pm(e.message === "db 404" ? "ยังไม่ได้รัน SQL ฟังก์ชัน admin_pending_edit ใน Supabase" : e.user ? e.message : "บันทึกไม่สำเร็จ (" + e.message + ")", "err"); }
   plock(false); await loadPending(true);
 }
-// เตือนรายการค้างนาน: ส่งเข้า Discord ซ้ำได้ไม่เกิน 1 ครั้ง/3 ชม. ต่อเบราว์เซอร์ (ทำงานตอนเปิดหน้าแอดมินไว้)
+// เตือนรายการค้างนาน: ส่งเข้า Discord ซ้ำได้ไม่เกิน 1 ครั้ง/30 นาที ต่อเบราว์เซอร์ (ทำงานตอนเปิดหน้าแอดมินไว้)
 async function remindLate() {
+  if (CFG.clientRemind !== true) return; // ปกติให้ Supabase (pg_cron) เตือนแทน ใส่ clientRemind: true ใน config.js ถ้าอยากให้หน้านี้เตือนเองด้วย
   const late = PEND.filter(r => r.status === "pending" && Date.now() - new Date(r.created_at).getTime() > LATE_MS);
   if (!late.length) return;
   let last = 0; try { last = Number(localStorage.getItem("lateRemind")) || 0; } catch (e) {}
-  if (Date.now() - last < LATE_MS) return;
+  if (Date.now() - last < REMIND_MS) return;
   try { localStorage.setItem("lateRemind", String(Date.now())); } catch (e) {}
   const role = CFG.adminRoleId ? String(CFG.adminRoleId) : "";
   try {
-    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", content: role ? "<@&" + role + ">" : undefined, allowed_mentions: role ? { roles: [role] } : { parse: [] }, embeds: [{ title: "⏰ มีรายการรออนุมัติเกิน 3 ชั่วโมง", color: 0xFF8A7A, description: late.slice(0, 10).map(r => "• **" + r.ign + "** — รอมา " + Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000) + " ชม.").join("\n") + (late.length > 10 ? "\n…และอีก " + (late.length - 10) + " รายการ" : "") + "\n\nรบกวนแอดมินเข้าไปตรวจ/อนุมัติด้วยครับ", footer: { text: "Rockman · แจ้งเตือนอัตโนมัติ" } }] } });
+    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", content: role ? "<@&" + role + ">" : undefined, allowed_mentions: role ? { roles: [role] } : { parse: [] }, embeds: [{ title: "⏰ มีรายการรออนุมัติค้างเกิน 5 นาที", color: 0xFF8A7A, description: late.slice(0, 10).map(r => "• **" + r.ign + "** — รอมา " + waitTxt(Date.now() - new Date(r.created_at).getTime())).join("\n") + (late.length > 10 ? "\n…และอีก " + (late.length - 10) + " รายการ" : "") + "\n\nรบกวนแอดมินเข้าไปตรวจ/อนุมัติด้วยครับ", footer: { text: "Rockman · แจ้งเตือนอัตโนมัติ" } }] } });
   } catch (e) {}
 }
 // ===== ประวัติอนุมัติ/ปฏิเสธ =====
