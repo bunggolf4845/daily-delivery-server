@@ -72,8 +72,19 @@ li small{display:block;color:var(--mute);font-size:.74rem;margin-top:2px}
 .pmsg{min-height:1.3em;margin:6px 0 0;font-size:.9rem;font-weight:600}
 .pmsg.ok{color:var(--ok)}.pmsg.err{color:var(--bad)}
 body{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+.pc.late{border-left-color:var(--bad);background:#1a0e0c}
+.pc .lt{margin:8px 0 0;font-size:.84rem;color:var(--bad);font-weight:600}
+.pc .ei{display:flex;gap:6px;margin:6px 0 0}
+.pc .ei select{flex:1;min-width:0;margin:0;padding:9px}
+.pc .ei input{flex:0 0 96px;margin:0;padding:9px}
+.pc .ebtn{display:flex;gap:8px;margin-top:10px}
+.pc .ebtn button{flex:1;width:auto}
+button.mini{width:auto;padding:6px 11px;font-size:.76rem;background:#0a0a0a;color:var(--hi);border:1px solid var(--line);box-shadow:none}
+.pc.rej{border-left-color:#6b4a46}.pc.apv{border-left-color:var(--ok)}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.72rem;font-weight:700;margin-right:6px}
+.tag.a{background:#12301d;color:var(--ok)}.tag.r{background:#3a1814;color:var(--bad)}
 #panel .card[data-tab]{display:none}
-#panel[data-t="pend"] .card[data-tab="pend"],#panel[data-t="sum"] .card[data-tab="sum"],#panel[data-t="tools"] .card[data-tab="tools"],#panel[data-t="list"] .card[data-tab="list"]{display:block}
+#panel[data-t="pend"] .card[data-tab="pend"],#panel[data-t="sum"] .card[data-tab="sum"],#panel[data-t="tools"] .card[data-tab="tools"],#panel[data-t="list"] .card[data-tab="list"],#panel[data-t="hist"] .card[data-tab="hist"]{display:block}
 #tabs{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;padding:10px max(6px,calc((100% - 480px)/2)) max(14px,env(safe-area-inset-bottom,0px));background:#15130f;border-top:1px solid var(--line)}
 #tabs button{flex:1;width:auto;min-width:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--mute);font-size:.78rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:5px;-webkit-tap-highlight-color:transparent;transform:none}
 #tabs .pill{position:relative;display:flex;align-items:center;justify-content:center;width:64px;height:32px;border-radius:16px;transition:background .25s}
@@ -103,6 +114,14 @@ body{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
       <div id="pendList"></div>
       <p class="pmsg" id="pendMsg" role="status"></p>
       <button class="sec" id="pendRef" type="button">🔄 รีเฟรชรายการ</button>
+    </section>
+    <section class="card" data-tab="hist">
+      <h2>🕘 ประวัติอนุมัติ/ปฏิเสธ</h2>
+      <select id="histF"><option value="">ทั้งหมด</option><option value="approved">เฉพาะอนุมัติ</option><option value="rejected">เฉพาะปฏิเสธ</option></select>
+      <p class="cnt" id="histCnt"></p>
+      <div id="histList"></div>
+      <p class="pmsg" id="histMsg" role="status"></p>
+      <button class="sec" id="histRef" type="button">🔄 รีเฟรชประวัติ</button>
     </section>
     <section class="card" data-tab="sum">
       <h2>📊 สรุปยอดรวม</h2>
@@ -134,6 +153,7 @@ body{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
   <button type="button" data-t="pend" class="on" aria-current="page"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg><i class="tbd" id="tabBadge" hidden>0</i></span><span>รออนุมัติ</span></button>
   <button type="button" data-t="sum" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></span><span>สรุป</span></button>
   <button type="button" data-t="tools" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><span>จัดการ</span></button>
+  <button type="button" data-t="hist" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span>ประวัติ</span></button>
   <button type="button" data-t="list" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><span>รายการ</span></button>
 </nav>
 <div id="editBox" hidden>
@@ -295,7 +315,7 @@ function buildEmbeds(r) {
   for (let i = 1; i < urls.length; i++) embeds.push({ url: gal, image: { url: urls[i] } });
   return embeds;
 }
-let PEND = [], pbusy = false;
+const LATE_MS = 3 * 3600 * 1000; let PEND = [], pbusy = false, EDITING = false;
 const pm = (t, c) => { $("pendMsg").textContent = t || ""; $("pendMsg").className = "pmsg " + (c || ""); };
 async function pcall(name, args) {
   const r = await rpc(name, Object.assign({ p_pass: PASS }, args || {}));
@@ -303,13 +323,15 @@ async function pcall(name, args) {
   return r;
 }
 function pcard(r) {
-  const c = el("div", "pc" + (r.status === "approved" ? " warn" : ""));
+  const late = r.status === "pending" && (Date.now() - new Date(r.created_at).getTime()) > LATE_MS;
+  const c = el("div", "pc" + (r.status === "approved" ? " warn" : late ? " late" : ""));
   const h = el("div", "ph"); h.append(el("strong", "", r.ign), el("small", "", agoT(r.created_at))); c.appendChild(h);
   if (r.dc && String(r.dc).toLowerCase() !== String(r.ign).toLowerCase()) c.appendChild(el("p", "pl", "💬 Discord: " + r.dc));
   const it = el("div", "pi"); let tot = 0;
   (r.items || []).forEach(x => { tot += Number(x.qty) || 0; const d = el("div"); d.append(STY(x.type).icon + " " + x.type + " ", el("b", "", fmt(x.qty) + " ชิ้น")); it.appendChild(d); });
   if ((r.items || []).length > 1) { const d = el("div"); d.append("📊 รวม ", el("b", "", fmt(tot) + " ชิ้น")); it.appendChild(d); }
   c.appendChild(it);
+  if (late) c.appendChild(el("p", "lt", "⏰ รอมานาน " + Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000) + " ชม. — รีบตรวจ"));
   if (r.loc) c.appendChild(el("p", "pl", "📍 ตำแหน่ง: " + r.loc));
   const th = el("div", "pth"), all = (r.photos || []).concat(r.loc_photo ? [r.loc_photo] : []);
   all.forEach((u, i) => {
@@ -323,12 +345,25 @@ function pcard(r) {
     c.appendChild(el("p", "pn", "อนุมัติและนับยอดแล้ว แต่ยังส่งเข้า Discord ไม่สำเร็จ"));
     const ok = el("button", "", "📤 ส่งเข้า Discord อีกครั้ง"); ok.type = "button"; ok.onclick = () => approvePend(r); act.appendChild(ok); c.appendChild(act); return c;
   }
+  const ed = el("button", "mini", "✏️ แก้จำนวน/หมวดก่อนอนุมัติ"); ed.type = "button"; ed.style.marginTop = "10px";
+  const eb = el("div", "ebtn"); eb.hidden = true; const eis = el("div"); eis.hidden = true;
+  const types = (CFG.itemTypes && CFG.itemTypes.length ? CFG.itemTypes : ["แร่", "กำมะถัน"]).slice();
+  const rows = (r.items || []).map(x => {
+    const line = el("div", "ei"), sel = el("select"), q = el("input"); const ts = types.slice(); if (x.type && !ts.includes(x.type)) ts.push(x.type);
+    ts.forEach(t => { const o = el("option", "", t); o.value = t; if (t === x.type) o.selected = true; sel.appendChild(o); });
+    q.type = "number"; q.min = 1; q.max = 99999; q.step = 1; q.inputMode = "numeric"; q.value = x.qty; line.append(sel, q); eis.appendChild(line); return { sel, q };
+  });
+  const sv = el("button", "", "💾 บันทึกการแก้"), cx = el("button", "sec", "ยกเลิก"); sv.type = cx.type = "button"; eb.append(sv, cx);
+  ed.onclick = () => { EDITING = true; eis.hidden = eb.hidden = false; ed.hidden = true; };
+  cx.onclick = () => { EDITING = false; renderPend(); };
+  sv.onclick = () => saveEdit(r, rows.map(x => ({ type: x.sel.value, qty: parseInt(x.q.value, 10) })));
+  c.append(ed, eis, eb);
   const ok = el("button", "", "✅ อนุมัติ"); ok.type = "button"; ok.onclick = () => approvePend(r);
   const no = el("button", "no", "❌ ปฏิเสธ"); no.type = "button";
   const box = el("div", "prej"); box.hidden = true;
   const inp = el("input"); inp.type = "text"; inp.maxLength = 120; inp.placeholder = "เหตุผล (ไม่บังคับ) เช่น รูปไม่ชัด";
   const cf = el("button", "", "ยืนยัน"); cf.type = "button"; cf.onclick = () => rejectPend(r, inp.value.trim());
-  box.append(inp, cf); no.onclick = () => { box.hidden = !box.hidden; if (!box.hidden) inp.focus(); };
+  box.append(inp, cf); no.onclick = () => { box.hidden = !box.hidden; if (!box.hidden) { EDITING = true; inp.focus(); } };
   act.append(ok, no); c.append(act, box); return c;
 }
 function renderPend() {
@@ -341,9 +376,60 @@ function renderPend() {
   PEND.forEach(r => list.appendChild(pcard(r)));
 }
 async function loadPending(silent) {
-  try { const r = await pcall("admin_pending_list"); PEND = r.rows || []; renderPend(); if (!silent) pm(""); }
+  if (silent && EDITING) return; // กำลังแก้/พิมพ์เหตุผลอยู่ ไม่รีเฟรชทับ
+  try { const r = await pcall("admin_pending_list"); PEND = r.rows || []; renderPend(); remindLate(); if (!silent) pm(""); }
   catch (e) { if (!silent) pm(e.message === "db 404" ? "ยังไม่ได้รัน approval.sql ใน Supabase" : e.user ? e.message : "โหลดรายการรออนุมัติไม่สำเร็จ (" + e.message + ")", "err"); }
 }
+async function saveEdit(r, items) {
+  if (pbusy) return;
+  if (!items.length || items.some(x => !x.type || !(x.qty >= 1 && x.qty <= 99999))) return pm("จำนวนต้องเป็นตัวเลข 1 ถึง 99,999", "err");
+  plock(true); pm("กำลังบันทึกการแก้...");
+  try { await pcall("admin_pending_edit", { p_id: r.id, p_items: items }); EDITING = false; pm("แก้ไขรายการของ " + r.ign + " แล้ว กดอนุมัติได้เลย", "ok"); }
+  catch (e) { pm(e.message === "db 404" ? "ยังไม่ได้รัน SQL ฟังก์ชัน admin_pending_edit ใน Supabase" : e.user ? e.message : "บันทึกไม่สำเร็จ (" + e.message + ")", "err"); }
+  plock(false); await loadPending(true);
+}
+// เตือนรายการค้างนาน: ส่งเข้า Discord ซ้ำได้ไม่เกิน 1 ครั้ง/3 ชม. ต่อเบราว์เซอร์ (ทำงานตอนเปิดหน้าแอดมินไว้)
+async function remindLate() {
+  const late = PEND.filter(r => r.status === "pending" && Date.now() - new Date(r.created_at).getTime() > LATE_MS);
+  if (!late.length) return;
+  let last = 0; try { last = Number(localStorage.getItem("lateRemind")) || 0; } catch (e) {}
+  if (Date.now() - last < LATE_MS) return;
+  try { localStorage.setItem("lateRemind", String(Date.now())); } catch (e) {}
+  const role = CFG.adminRoleId ? String(CFG.adminRoleId) : "";
+  try {
+    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", content: role ? "<@&" + role + ">" : undefined, allowed_mentions: role ? { roles: [role] } : { parse: [] }, embeds: [{ title: "⏰ มีรายการรออนุมัติเกิน 3 ชั่วโมง", color: 0xFF8A7A, description: late.slice(0, 10).map(r => "• **" + r.ign + "** — รอมา " + Math.floor((Date.now() - new Date(r.created_at).getTime()) / 3600000) + " ชม.").join("\n") + (late.length > 10 ? "\n…และอีก " + (late.length - 10) + " รายการ" : "") + "\n\nรบกวนแอดมินเข้าไปตรวจ/อนุมัติด้วยครับ", footer: { text: "Rockman · แจ้งเตือนอัตโนมัติ" } }] } });
+  } catch (e) {}
+}
+// ===== ประวัติอนุมัติ/ปฏิเสธ =====
+let HIST = [];
+const hm = (t, c) => { $("histMsg").textContent = t || ""; $("histMsg").className = "pmsg " + (c || ""); };
+function hcard(r) {
+  const rej = r.status === "rejected", c = el("div", "pc " + (rej ? "rej" : "apv"));
+  const h = el("div", "ph"); h.append(el("strong", "", r.ign), el("small", "", new Date(r.decided_at || r.created_at).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))); c.appendChild(h);
+  const it = el("div", "pi"); const t = el("div"); t.append(el("span", "tag " + (rej ? "r" : "a"), rej ? "ปฏิเสธ" : "อนุมัติ"));
+  t.append((r.items || []).map(x => STY(x.type).icon + " " + x.type + " " + fmt(x.qty) + " ชิ้น").join(" · ")); it.appendChild(t); c.appendChild(it);
+  if (r.dc && String(r.dc).toLowerCase() !== String(r.ign).toLowerCase()) c.appendChild(el("p", "pl", "💬 Discord: " + r.dc));
+  if (rej) c.appendChild(el("p", "pn", "เหตุผล: " + (r.reason || "ไม่ได้ระบุ")));
+  if (r.decided_by) c.appendChild(el("p", "pl", "โดย " + r.decided_by));
+  const b = el("button", "mini", "↩️ ย้อนกลับ (กลับไปรออนุมัติ)"); b.type = "button"; b.style.marginTop = "10px";
+  b.onclick = () => revertHist(r); c.appendChild(b); return c;
+}
+function renderHist() {
+  const f = $("histF").value, rows = f ? HIST.filter(r => r.status === f) : HIST, list = $("histList"); list.innerHTML = "";
+  $("histCnt").textContent = "แสดง " + rows.length + " รายการล่าสุด";
+  if (!rows.length) list.appendChild(el("p", "empty", "ยังไม่มีประวัติ")); rows.forEach(r => list.appendChild(hcard(r)));
+}
+async function loadHistory() {
+  try { const r = await pcall("admin_history_list", { p_limit: 100 }); HIST = r.rows || []; renderHist(); hm(""); }
+  catch (e) { hm(e.message === "db 404" ? "ยังไม่ได้รัน SQL ฟังก์ชัน admin_history_list ใน Supabase" : e.user ? e.message : "โหลดประวัติไม่สำเร็จ (" + e.message + ")", "err"); }
+}
+async function revertHist(r) {
+  const was = r.status === "rejected" ? "ปฏิเสธ" : "อนุมัติ";
+  if (!confirm("ย้อนการ" + was + "ของ " + r.ign + " กลับไปรออนุมัติ?" + (r.status === "approved" ? "\n(ยอดที่นับไปแล้วจะถูกหักออกจนกว่าจะอนุมัติใหม่ และข้อความใน Discord ต้องลบเอง)" : ""))) return;
+  try { await pcall("admin_revert", { p_id: r.id }); hm("ย้อนกลับแล้ว รายการกลับไปที่แท็บรออนุมัติ", "ok"); await Promise.all([loadHistory(), loadPending(true)]); load().catch(() => {}); loadSummary(); }
+  catch (e) { hm(e.message === "db 404" ? "ยังไม่ได้รัน SQL ฟังก์ชัน admin_revert ใน Supabase" : e.user ? e.message : "ย้อนกลับไม่สำเร็จ (" + e.message + ")", "err"); }
+}
+$("histF").onchange = renderHist; $("histRef").onclick = loadHistory;
 const plock = on => { pbusy = on; document.querySelectorAll("#pendList button").forEach(b => { b.disabled = on; }); };
 async function approvePend(r) {
   if (pbusy) return; plock(true); pm("กำลังอนุมัติ...");
@@ -359,20 +445,21 @@ async function approvePend(r) {
   } catch (e) {
     pm(approved ? "อนุมัติและนับยอดแล้ว แต่ส่งเข้า Discord ไม่สำเร็จ — กด “ส่งเข้า Discord อีกครั้ง” ที่รายการ" : (e.user ? e.message : "อนุมัติไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่"), "err");
   }
-  plock(false); await loadPending(true); load().catch(() => {}); loadSummary();
+  EDITING = false; plock(false); await loadPending(true); load().catch(() => {}); loadSummary();
 }
 async function rejectPend(r, why) {
   if (pbusy) return; plock(true); pm("กำลังบันทึก...");
   try { await pcall("admin_reject", { p_id: r.id, p_reason: why }); pm("ปฏิเสธ " + r.ign + " แล้ว", "ok"); }
   catch (e) { pm(e.user ? e.message : "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง", "err"); }
-  plock(false); await loadPending(true);
+  EDITING = false; plock(false); await loadPending(true);
 }
-$("pendRef").onclick = () => loadPending();
+$("pendRef").onclick = () => { EDITING = false; loadPending(); };
 setInterval(() => { if (PASS && !$("panel").hidden && !document.hidden && !pbusy) loadPending(true); }, 30000);
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-t]"); if (!b) return;
   $("panel").dataset.t = b.dataset.t;
   $("tabs").querySelectorAll("button").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-current", on ? "page" : "false"); });
+  if (b.dataset.t === "hist") loadHistory();
   scrollTo({ top: 0 });
 });
 const saved = sessionStorage.getItem("adm"); if (saved) { $("pass").value = saved; enter(true); }
