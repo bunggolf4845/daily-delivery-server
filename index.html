@@ -263,6 +263,7 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
 .shact button.ghost{color:var(--gold-hi);background:#0a0a0a;border:1px solid var(--line);box-shadow:none}
 .shtip{margin:8px 0 0;font-size:.78rem;color:var(--mute)}
 
+.rc{display:block;margin-top:2px;font-size:.74rem;font-weight:600;line-height:1.3}.rc.up{color:var(--ok)}.rc.dn{color:var(--err)}.rc.eq{color:var(--mute);font-weight:400}
 .today.pending{color:var(--gold-hi);border-color:rgba(242,180,43,.6);background:rgba(242,180,43,.08)}
 .today.rej{color:var(--err);border-color:rgba(255,138,122,.5)}
 </style>
@@ -325,6 +326,7 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
       <button type="button" id="modeP" aria-pressed="true">เรียงตามชิ้น</button>
       <button type="button" id="modeD" aria-pressed="false">เรียงตามวันที่ส่ง</button>
     </div>
+    <p class="sub" id="modeNote" style="margin:0 0 8px;font-size:.78rem"></p>
     <p class="sub" id="boardMonth" style="margin:0 0 2px"></p>
     <p class="sub" id="countdown" style="margin:0 0 10px"></p>
     <div class="mine" id="mine" hidden></div>
@@ -622,6 +624,16 @@ async function loadBoard() {
     const data = mergeAliases(await rpc("leaderboard", { p_month: mo.key }));
     const byD = rankMode === "d", dayOf = x => Number(x.days) || 0;
     if (byD) data.sort((x, y) => dayOf(y) - dayOf(x) || y.total - x.total);
+    const kOf = x => String(x.ign).toLowerCase(), rP = {}, rD = {};
+    [...data].sort((x, y) => y.total - x.total).forEach((x, i) => { rP[kOf(x)] = i + 1; });
+    [...data].sort((x, y) => dayOf(y) - dayOf(x) || y.total - x.total).forEach((x, i) => { rD[kOf(x)] = i + 1; });
+    const rcEl = (d, pos) => {
+      const diff = (byD ? rP : rD)[kOf(d)] - pos, e = document.createElement("small");
+      e.className = "rc " + (diff > 0 ? "up" : diff < 0 ? "dn" : "eq");
+      e.textContent = diff > 0 ? "↑ " + diff + " อันดับ" : diff < 0 ? "↓ " + (-diff) + " อันดับ" : "เท่าเดิม";
+      return e;
+    };
+    $("modeNote").textContent = "ลูกศร = เทียบกับอันดับแบบ" + (byD ? "ชิ้น" : "วันที่ส่ง");
     if (!data || !data.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = "ยังไม่มีข้อมูลของเดือนนี้"; rows.appendChild(p); return; }
     const me = (savedNames().ign || "").toLowerCase(), isMe = d => !!me && String(d.ign).toLowerCase() === me;
     renderMine(data);
@@ -638,7 +650,7 @@ async function loadBoard() {
       if (byD) { const sm = document.createElement("small"); sm.textContent = Number(d.total).toLocaleString("th-TH") + " ชิ้น"; pt.appendChild(sm); }
       pt.appendChild(meter((byD ? dayOf(d) : Number(d.total)) / max));
       const bar = document.createElement("div"); bar.className = "bar"; bar.textContent = medal[i];
-      w.append(nm, pt, bar); $("pod").appendChild(w);
+      w.append(nm, rcEl(d, i + 1), pt, bar); $("pod").appendChild(w);
     });
     data.slice(3).forEach((d, k) => {
       const li = document.createElement("li"); if (isMe(d)) li.className = "me";
@@ -648,6 +660,7 @@ async function loadBoard() {
       const b = document.createElement("b"); byD ? countUp(b, dayOf(d), "วัน") : countUp(b, Number(d.total));
       tt.append(b);
       if (byD) { const sm = document.createElement("small"); sm.textContent = Number(d.total).toLocaleString("th-TH") + " ชิ้น"; tt.append(sm); }
+      tt.append(rcEl(d, k + 4));
       const mid = document.createElement("div"); mid.className = "mid"; mid.append(nm, meter((byD ? dayOf(d) : Number(d.total)) / max));
       li.append(rk, mid, tt); rows.appendChild(li);
     });
