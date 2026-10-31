@@ -71,6 +71,17 @@ li small{display:block;color:var(--mute);font-size:.74rem;margin-top:2px}
 .prej button{flex:0 0 auto;width:auto;background:#1c0f0e;color:var(--bad);border:1px solid #4a2320;box-shadow:none}
 .pmsg{min-height:1.3em;margin:6px 0 0;font-size:.9rem;font-weight:600}
 .pmsg.ok{color:var(--ok)}.pmsg.err{color:var(--bad)}
+body{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+#panel .card[data-tab]{display:none}
+#panel[data-t="pend"] .card[data-tab="pend"],#panel[data-t="sum"] .card[data-tab="sum"],#panel[data-t="tools"] .card[data-tab="tools"],#panel[data-t="list"] .card[data-tab="list"]{display:block}
+#tabs{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;padding:10px max(6px,calc((100% - 480px)/2)) max(14px,env(safe-area-inset-bottom,0px));background:#15130f;border-top:1px solid var(--line)}
+#tabs button{flex:1;width:auto;min-width:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--mute);font-size:.78rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:5px;-webkit-tap-highlight-color:transparent;transform:none}
+#tabs .pill{position:relative;display:flex;align-items:center;justify-content:center;width:64px;height:32px;border-radius:16px;transition:background .25s}
+#tabs svg{width:24px;height:24px}
+#tabs button.on{color:var(--hi)}
+#tabs button.on .pill{background:rgba(242,180,43,.24)}
+#tabs button:focus-visible .pill{outline:2px solid var(--gold)}
+#tabs .tbd{position:absolute;top:-5px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--bad);color:#1b0b07;font-style:normal;font-size:.7rem;font-weight:700;line-height:18px;text-align:center;box-shadow:0 0 0 2px #15130f}
 </style>
 <script>document.write('<script src="config.js?t='+Date.now()+'"><\/script>')</script>
 </head>
@@ -85,33 +96,33 @@ li small{display:block;color:var(--mute);font-size:.74rem;margin-top:2px}
     <button id="go">เข้าสู่ระบบ</button>
   </section>
 
-  <div id="panel" hidden>
-    <section class="card" id="pendCard">
+  <div id="panel" data-t="pend" hidden>
+    <section class="card" id="pendCard" data-tab="pend">
       <h2>📥 รออนุมัติ<span class="pbadge" id="pendBadge" hidden>0</span></h2>
       <p class="cnt" id="pendSum"></p>
       <div id="pendList"></div>
       <p class="pmsg" id="pendMsg" role="status"></p>
       <button class="sec" id="pendRef" type="button">🔄 รีเฟรชรายการ</button>
     </section>
-    <section class="card">
+    <section class="card" data-tab="sum">
       <h2>📊 สรุปยอดรวม</h2>
       <select id="sumMonth"><option value="0">เดือนนี้</option><option value="-1">เดือนที่แล้ว</option></select>
       <div id="sumBox"><p class="empty">กำลังโหลด…</p></div>
     </section>
 
-    <section class="card">
+    <section class="card" data-tab="tools">
       <h2>🔀 รวมชื่อที่พิมพ์ผิด</h2>
       <input id="from" type="text" placeholder="ชื่อที่ผิด (เช่น Rockman 49)" autocomplete="off">
       <input id="to" type="text" placeholder="ชื่อที่ถูก (เช่น RM Rockman)" autocomplete="off">
       <button id="ren">รวมชื่อ</button>
     </section>
 
-    <section class="card">
+    <section class="card" data-tab="tools">
       <h2>📣 ประกาศสรุปเดือนที่แล้วอีกครั้ง</h2>
       <button class="sec" id="sum">โพสต์สรุปเข้า Discord</button>
     </section>
 
-    <section class="card">
+    <section class="card" data-tab="list">
       <h2>📋 รายการล่าสุด</h2>
       <input id="q" type="search" placeholder="ค้นหา ชื่อ / Discord / หมวด / วันที่ / #เลข" autocomplete="off">
       <p class="cnt" id="cnt"></p>
@@ -119,6 +130,12 @@ li small{display:block;color:var(--mute);font-size:.74rem;margin-top:2px}
     </section>
   </div>
 </main>
+<nav id="tabs" aria-label="เมนูแอดมิน" hidden>
+  <button type="button" data-t="pend" class="on" aria-current="page"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg><i class="tbd" id="tabBadge" hidden>0</i></span><span>รออนุมัติ</span></button>
+  <button type="button" data-t="sum" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></span><span>สรุป</span></button>
+  <button type="button" data-t="tools" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><span>จัดการ</span></button>
+  <button type="button" data-t="list" aria-current="false"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><span>รายการ</span></button>
+</nav>
 <div id="editBox" hidden>
   <div class="card" style="width:100%;max-width:420px;margin:0">
     <h2 id="editTitle">✏️ แก้ไขรายการ</h2>
@@ -180,7 +197,7 @@ async function loadSummary() {
 $("sumMonth").onchange = loadSummary;
 async function enter(auto) {
   PASS = $("pass").value.trim(); if (!PASS) return;
-  try { await load(); loadSummary(); loadPending(); sessionStorage.setItem("adm", PASS); $("login").hidden = true; $("panel").hidden = false; say(""); }
+  try { await load(); loadSummary(); loadPending(); sessionStorage.setItem("adm", PASS); $("login").hidden = true; $("panel").hidden = false; $("tabs").hidden = false; say(""); }
   catch (e) {
     sessionStorage.removeItem("adm"); if (auto) { $("pass").value = ""; return; }
     const m = String(e.message), c = m.replace("db ", "");
@@ -318,6 +335,7 @@ function renderPend() {
   const list = $("pendList"); list.innerHTML = "";
   const n = PEND.filter(r => r.status === "pending").length, stuck = PEND.length - n;
   $("pendBadge").hidden = !PEND.length; $("pendBadge").textContent = PEND.length;
+  $("tabBadge").hidden = !PEND.length; $("tabBadge").textContent = PEND.length > 99 ? "99+" : PEND.length;
   $("pendSum").textContent = PEND.length ? "รออนุมัติ " + n + " รายการ" + (stuck ? " · ค้างส่ง Discord " + stuck : "") : "";
   if (!PEND.length) list.appendChild(el("p", "empty", "ไม่มีรายการรออนุมัติ 🎉"));
   PEND.forEach(r => list.appendChild(pcard(r)));
@@ -351,6 +369,12 @@ async function rejectPend(r, why) {
 }
 $("pendRef").onclick = () => loadPending();
 setInterval(() => { if (PASS && !$("panel").hidden && !document.hidden && !pbusy) loadPending(true); }, 30000);
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-t]"); if (!b) return;
+  $("panel").dataset.t = b.dataset.t;
+  $("tabs").querySelectorAll("button").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-current", on ? "page" : "false"); });
+  scrollTo({ top: 0 });
+});
 const saved = sessionStorage.getItem("adm"); if (saved) { $("pass").value = saved; enter(true); }
 </script>
 </body>
