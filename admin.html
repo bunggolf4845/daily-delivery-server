@@ -48,6 +48,29 @@ li small{display:block;color:var(--mute);font-size:.74rem;margin-top:2px}
 .stat span{font-size:.74rem;color:var(--mute)}
 .cnt{font-size:.78rem;color:var(--mute);margin:0 0 6px}
 [hidden]{display:none!important}
+.pbadge{display:inline-block;min-width:22px;padding:0 7px;margin-left:8px;border-radius:999px;background:var(--bad);color:#1b0b07;font-family:"Prompt",sans-serif;font-style:normal;font-size:.78rem;font-weight:700;line-height:22px;text-align:center;vertical-align:middle}
+.pc{padding:14px;border:1px solid #2a2316;border-left:3px solid var(--gold);border-radius:12px;background:#0d0c0a;margin-bottom:12px}
+.pc.warn{border-left-color:var(--bad)}
+.pc .ph{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.pc .ph strong{color:var(--hi);font-size:1.02rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc .ph small{color:var(--mute);font-size:.74rem;flex:none}
+.pc .pi{margin:8px 0 0;display:flex;flex-direction:column;gap:2px;font-size:.9rem}
+.pc .pi b{color:var(--hi)}
+.pc .pl{margin:4px 0 0;font-size:.82rem;color:var(--mute)}
+.pc .pn{margin:8px 0 0;font-size:.84rem;color:var(--bad)}
+.pth{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.pth a{position:relative;display:block;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#0a0a0a}
+.pth a.lp{border-color:var(--gold)}
+.pth img{width:100%;height:100%;object-fit:cover;display:block}
+.pth a.lp::after{content:"📍";position:absolute;left:3px;bottom:2px;font-size:.8rem}
+.pact{display:flex;gap:8px;margin-top:12px}
+.pact button{flex:1;width:auto}
+.pact button.no{flex:0 0 36%;background:#1c0f0e;color:var(--bad);border:1px solid #4a2320;box-shadow:none}
+.prej{display:flex;gap:8px;margin-top:10px}
+.prej input{flex:1;min-width:0;margin:0}
+.prej button{flex:0 0 auto;width:auto;background:#1c0f0e;color:var(--bad);border:1px solid #4a2320;box-shadow:none}
+.pmsg{min-height:1.3em;margin:6px 0 0;font-size:.9rem;font-weight:600}
+.pmsg.ok{color:var(--ok)}.pmsg.err{color:var(--bad)}
 </style>
 <script src="config.js"></script>
 </head>
@@ -63,6 +86,13 @@ li small{display:block;color:var(--mute);font-size:.74rem;margin-top:2px}
   </section>
 
   <div id="panel" hidden>
+    <section class="card" id="pendCard">
+      <h2>📥 รออนุมัติ<span class="pbadge" id="pendBadge" hidden>0</span></h2>
+      <p class="cnt" id="pendSum"></p>
+      <div id="pendList"></div>
+      <p class="pmsg" id="pendMsg" role="status"></p>
+      <button class="sec" id="pendRef" type="button">🔄 รีเฟรชรายการ</button>
+    </section>
     <section class="card">
       <h2>📊 สรุปยอดรวม</h2>
       <select id="sumMonth"><option value="0">เดือนนี้</option><option value="-1">เดือนที่แล้ว</option></select>
@@ -150,7 +180,7 @@ async function loadSummary() {
 $("sumMonth").onchange = loadSummary;
 async function enter(auto) {
   PASS = $("pass").value.trim(); if (!PASS) return;
-  try { await load(); loadSummary(); sessionStorage.setItem("adm", PASS); $("login").hidden = true; $("panel").hidden = false; say(""); }
+  try { await load(); loadSummary(); loadPending(); sessionStorage.setItem("adm", PASS); $("login").hidden = true; $("panel").hidden = false; say(""); }
   catch (e) {
     sessionStorage.removeItem("adm"); if (auto) { $("pass").value = ""; return; }
     const m = String(e.message), c = m.replace("db ", "");
@@ -205,6 +235,122 @@ $("sum").onclick = async () => {
     say("ส่งคำสั่งโพสต์แล้ว ลองเช็กในดิสคอร์ดอีกครั้ง", "ok");
   } catch (e) { say("โพสต์ไม่สำเร็จ", "err"); }
 };
+// ===== คิวรออนุมัติ: ตรวจรูป → อนุมัติ/ปฏิเสธ → อนุมัติแล้วถึงนับยอด + ลง Discord =====
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const safeUrl = u => /^https:\/\//.test(u) ? u : "";
+const agoT = t => { const m = Math.floor((Date.now() - new Date(t).getTime()) / 60000); if (isNaN(m)) return ""; if (m < 1) return "เมื่อสักครู่"; if (m < 60) return m + " นาทีที่แล้ว"; if (m < 1440) return Math.floor(m / 60) + " ชม.ที่แล้ว"; return new Date(t).toLocaleDateString("th-TH", { day: "numeric", month: "short" }); };
+const STY = t => /แร่/.test(t) ? { icon: "⛏️", color: 0xF2B42B } : /กำมะถัน|ซัลเฟอร์/.test(t) ? { icon: "🟡", color: 0xE8D44D } : { icon: "📦", color: 0x1f7a5c };
+const ALIASES = { "Cannaÿ2026": "Cannanÿ2026" }; // ให้ตรงกับ index.html
+function mergeAliases(data) {
+  const map = {}; Object.keys(ALIASES).forEach(k => { map[k.toLowerCase()] = ALIASES[k]; });
+  const out = new Map();
+  (data || []).forEach(d => {
+    const name = map[String(d.ign).toLowerCase()] || d.ign, key = String(name).toLowerCase(), cur = out.get(key);
+    if (!cur) out.set(key, Object.assign({}, d, { ign: name, total: Number(d.total) }));
+    else { cur.total += Number(d.total); cur.days = Math.max(Number(cur.days) || 0, Number(d.days) || 0); }
+  });
+  return [...out.values()].sort((x, y) => y.total - x.total);
+}
+async function topNow() { try { return mergeAliases(await rpc("leaderboard", { p_month: monthKey(0).key }))[0] || null; } catch (e) { return null; } }
+async function announceTop(before, ign) {
+  try {
+    const after = await topNow();
+    if (!before || !after || String(after.ign).toLowerCase() === String(before.ign).toLowerCase()) return;
+    if (String(after.ign).toLowerCase() !== String(ign).toLowerCase()) return;
+    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [{ title: "👑 เปลี่ยนเจ้าของอันดับ 1!", color: 0xF2B42B, description: "**" + after.ign + "** แซง **" + before.ign + "** ขึ้นเป็นอันดับ 1 ด้วย **" + Number(after.total).toLocaleString("th-TH") + "** ชิ้น", footer: { text: "Rockman · ส่งของรายวัน" } }] } });
+  } catch (e) {}
+}
+function buildEmbeds(r) {
+  const items = r.items || [], multi = items.length > 1, total = items.reduce((t, x) => t + (Number(x.qty) || 0), 0);
+  const ign = r.ign, dc = r.dc || r.ign, loc = r.loc;
+  const urls = (r.photos || []).concat(r.loc_photo ? [r.loc_photo] : []).filter(safeUrl);
+  const sty = multi ? { icon: "🧺", color: 0xF2B42B } : STY(items[0].type), big = total >= 10000;
+  const same = String(dc).trim().toLowerCase() === String(ign).trim().toLowerCase();
+  const fields = [{ name: "👤 ชื่อในเกม", value: "**" + ign + "**", inline: true }];
+  if (!multi) fields.push({ name: sty.icon + " ประเภท", value: items[0].type, inline: true }, { name: "📊 จำนวน", value: "**" + Number(items[0].qty).toLocaleString("th-TH") + "** ชิ้น", inline: true });
+  else { items.forEach(x => fields.push({ name: STY(x.type).icon + " " + x.type, value: "**" + Number(x.qty).toLocaleString("th-TH") + "** ชิ้น", inline: true })); fields.push({ name: "📊 รวม", value: "**" + total.toLocaleString("th-TH") + "** ชิ้น", inline: true }); }
+  if (!same) fields.push({ name: "💬 Discord", value: dc, inline: true });
+  if (loc) fields.push({ name: "📍 ตำแหน่ง", value: loc, inline: true });
+  const gal = urls.length > 1 ? "https://discord.com" : undefined; // embed ที่ url เดียวกันจะรวมเป็นแกลเลอรี
+  const e0 = { title: (big ? "🔥 " : "") + sty.icon + " ส่งของรายวัน" + (big ? " · ยอดใหญ่!" : ""), color: sty.color, url: gal, fields, timestamp: new Date(r.created_at || Date.now()).toISOString(), footer: { text: "Rockman · ส่งของรายวัน · อนุมัติแล้ว ✅" } };
+  if (urls[0]) e0.image = { url: urls[0] };
+  const embeds = [e0];
+  for (let i = 1; i < urls.length; i++) embeds.push({ url: gal, image: { url: urls[i] } });
+  return embeds;
+}
+let PEND = [], pbusy = false;
+const pm = (t, c) => { $("pendMsg").textContent = t || ""; $("pendMsg").className = "pmsg " + (c || ""); };
+async function pcall(name, args) {
+  const r = await rpc(name, Object.assign({ p_pass: PASS }, args || {}));
+  if (!r || !r.ok) { const e = new Error((r && r.error) || "ผิดพลาด"); e.user = true; throw e; }
+  return r;
+}
+function pcard(r) {
+  const c = el("div", "pc" + (r.status === "approved" ? " warn" : ""));
+  const h = el("div", "ph"); h.append(el("strong", "", r.ign), el("small", "", agoT(r.created_at))); c.appendChild(h);
+  if (r.dc && String(r.dc).toLowerCase() !== String(r.ign).toLowerCase()) c.appendChild(el("p", "pl", "💬 Discord: " + r.dc));
+  const it = el("div", "pi"); let tot = 0;
+  (r.items || []).forEach(x => { tot += Number(x.qty) || 0; const d = el("div"); d.append(STY(x.type).icon + " " + x.type + " ", el("b", "", fmt(x.qty) + " ชิ้น")); it.appendChild(d); });
+  if ((r.items || []).length > 1) { const d = el("div"); d.append("📊 รวม ", el("b", "", fmt(tot) + " ชิ้น")); it.appendChild(d); }
+  c.appendChild(it);
+  if (r.loc) c.appendChild(el("p", "pl", "📍 ตำแหน่ง: " + r.loc));
+  const th = el("div", "pth"), all = (r.photos || []).concat(r.loc_photo ? [r.loc_photo] : []);
+  all.forEach((u, i) => {
+    const su = safeUrl(u); if (!su) return;
+    const a = el("a", r.loc_photo && i === all.length - 1 ? "lp" : ""); a.href = su; a.target = "_blank"; a.rel = "noopener";
+    const im = el("img"); im.src = su; im.loading = "lazy"; im.alt = "รูปที่ " + (i + 1); a.appendChild(im); th.appendChild(a);
+  });
+  if (th.children.length) c.appendChild(th);
+  const act = el("div", "pact");
+  if (r.status === "approved") {
+    c.appendChild(el("p", "pn", "อนุมัติและนับยอดแล้ว แต่ยังส่งเข้า Discord ไม่สำเร็จ"));
+    const ok = el("button", "", "📤 ส่งเข้า Discord อีกครั้ง"); ok.type = "button"; ok.onclick = () => approvePend(r); act.appendChild(ok); c.appendChild(act); return c;
+  }
+  const ok = el("button", "", "✅ อนุมัติ"); ok.type = "button"; ok.onclick = () => approvePend(r);
+  const no = el("button", "no", "❌ ปฏิเสธ"); no.type = "button";
+  const box = el("div", "prej"); box.hidden = true;
+  const inp = el("input"); inp.type = "text"; inp.maxLength = 120; inp.placeholder = "เหตุผล (ไม่บังคับ) เช่น รูปไม่ชัด";
+  const cf = el("button", "", "ยืนยัน"); cf.type = "button"; cf.onclick = () => rejectPend(r, inp.value.trim());
+  box.append(inp, cf); no.onclick = () => { box.hidden = !box.hidden; if (!box.hidden) inp.focus(); };
+  act.append(ok, no); c.append(act, box); return c;
+}
+function renderPend() {
+  const list = $("pendList"); list.innerHTML = "";
+  const n = PEND.filter(r => r.status === "pending").length, stuck = PEND.length - n;
+  $("pendBadge").hidden = !PEND.length; $("pendBadge").textContent = PEND.length;
+  $("pendSum").textContent = PEND.length ? "รออนุมัติ " + n + " รายการ" + (stuck ? " · ค้างส่ง Discord " + stuck : "") : "";
+  if (!PEND.length) list.appendChild(el("p", "empty", "ไม่มีรายการรออนุมัติ 🎉"));
+  PEND.forEach(r => list.appendChild(pcard(r)));
+}
+async function loadPending(silent) {
+  try { const r = await pcall("admin_pending_list"); PEND = r.rows || []; renderPend(); if (!silent) pm(""); }
+  catch (e) { if (!silent) pm(e.message === "db 404" ? "ยังไม่ได้รัน approval.sql ใน Supabase" : e.user ? e.message : "โหลดรายการรออนุมัติไม่สำเร็จ (" + e.message + ")", "err"); }
+}
+const plock = on => { pbusy = on; document.querySelectorAll("#pendList button").forEach(b => { b.disabled = on; }); };
+async function approvePend(r) {
+  if (pbusy) return; plock(true); pm("กำลังอนุมัติ...");
+  let approved = r.status === "approved", row = r;
+  try {
+    const before = await topNow();
+    if (!approved) { const x = await pcall("admin_approve", { p_id: r.id }); row = x.row; approved = true; }
+    pm("กำลังส่งเข้า Discord...");
+    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: buildEmbeds(row) } });
+    await pcall("admin_mark_posted", { p_id: r.id });
+    announceTop(before, r.ign);
+    pm("อนุมัติ " + r.ign + " แล้ว ✅ นับยอดและลง Discord เรียบร้อย", "ok");
+  } catch (e) {
+    pm(approved ? "อนุมัติและนับยอดแล้ว แต่ส่งเข้า Discord ไม่สำเร็จ — กด “ส่งเข้า Discord อีกครั้ง” ที่รายการ" : (e.user ? e.message : "อนุมัติไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่"), "err");
+  }
+  plock(false); await loadPending(true); load().catch(() => {}); loadSummary();
+}
+async function rejectPend(r, why) {
+  if (pbusy) return; plock(true); pm("กำลังบันทึก...");
+  try { await pcall("admin_reject", { p_id: r.id, p_reason: why }); pm("ปฏิเสธ " + r.ign + " แล้ว", "ok"); }
+  catch (e) { pm(e.user ? e.message : "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง", "err"); }
+  plock(false); await loadPending(true);
+}
+$("pendRef").onclick = () => loadPending();
+setInterval(() => { if (PASS && !$("panel").hidden && !document.hidden && !pbusy) loadPending(true); }, 30000);
 const saved = sessionStorage.getItem("adm"); if (saved) { $("pass").value = saved; enter(true); }
 </script>
 </body>
