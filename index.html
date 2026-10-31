@@ -718,15 +718,37 @@ $("locPic").addEventListener("change", () => {
   if (!f) return;
   locPic = f; msg(""); renderLocThumb(); try { window.updProgress && window.updProgress(); } catch (e) {}
 });
+// วันเวลาไทย เช่น 31/10/2569 14:32 (ใช้ประทับลายน้ำ)
+function stampTime() {
+  const p = {}; new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+  return p.day + "/" + p.month + "/" + p.year + " " + p.hour + ":" + p.minute;
+}
 // ย่อรูปก่อนส่ง (ด้านยาวสุด 1600px) ให้ส่งเร็วและไม่เกินขีดจำกัดของ Discord
-async function shrink(f) {
+// ถ้าส่ง stamp (ชื่อในเกม) มาด้วย จะประทับ "ชื่อ · วันเวลา" ที่มุมล่างซ้ายของรูป
+async function shrink(f, stamp) {
   try {
     const bmp = await createImageBitmap(f);
     const sc = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
     const c = document.createElement("canvas"); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
-    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const g = c.getContext("2d");
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    if (stamp) {
+      try { await document.fonts.load('600 24px Prompt'); } catch (e) {}
+      const fs = Math.max(16, Math.round(c.width * 0.03)), pad = Math.round(fs * 0.6), m = Math.round(fs * 0.6);
+      g.font = "600 " + fs + "px Prompt,'Noto Sans Thai',sans-serif"; g.textBaseline = "middle";
+      const name = stamp + " · ", time = stampTime();
+      const maxW = c.width - m * 2 - pad * 2;
+      let w = g.measureText(name).width + g.measureText(time).width, nm = name;
+      if (w > maxW) { while (nm.length > 4 && g.measureText(nm + "…").width + g.measureText(time).width > maxW) nm = nm.slice(0, -1); nm = nm.replace(/[ ·]+$/, "") + "… · "; w = g.measureText(nm).width + g.measureText(time).width; }
+      const bh = Math.round(fs * 1.6), bw = Math.min(w + pad * 2, c.width - m * 2), x = m, y = c.height - m - bh;
+      g.fillStyle = "rgba(0,0,0,.62)"; g.beginPath();
+      if (g.roundRect) g.roundRect(x, y, bw, bh, bh / 4); else g.rect(x, y, bw, bh);
+      g.fill();
+      g.fillStyle = "#ffd978"; g.fillText(nm, x + pad, y + bh / 2);
+      g.fillStyle = "#ffffff"; g.fillText(time, x + pad + g.measureText(nm).width, y + bh / 2);
+    }
     const blob = await new Promise(res => c.toBlob(res, "image/jpeg", .85));
-    if (blob && blob.size < f.size) return blob;
+    if (blob && (stamp || blob.size < f.size)) return blob;
   } catch (e) {}
   return f;
 }
@@ -752,7 +774,7 @@ $("send").addEventListener("click", async () => {
   msg("กำลังเตรียมรูป...");
   let saved = true;
   try {
-    const blobs = await Promise.all([...pics, locPic].map(shrink));
+    const blobs = await Promise.all([...pics, locPic].map(f => shrink(f, ign)));
     if (blobs.some(x => x.size > 8 * 1024 * 1024)) throw userErr("รูปใหญ่เกิน 8 MB กรุณาเลือกรูปที่เล็กกว่านี้");
     let sentToday = false;
     try { sentToday = await rpc("already_sent", { p_ign: ign }); } catch (e) { throw userErr("เชื่อมต่อฐานข้อมูลไม่ได้ ลองใหม่อีกครั้ง"); }
