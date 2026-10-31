@@ -321,6 +321,10 @@ main[data-v=send] .view:not([data-view=send]),main[data-v=rank] .view:not([data-
       <button type="button" id="tabNow" aria-pressed="true">เดือนนี้</button>
       <button type="button" id="tabPrev" aria-pressed="false">เดือนที่แล้ว</button>
     </div>
+    <div class="tabs" id="modeTabs" role="group" aria-label="เรียงอันดับตาม">
+      <button type="button" id="modeP" aria-pressed="true">เรียงตามชิ้น</button>
+      <button type="button" id="modeD" aria-pressed="false">เรียงตามวันที่ส่ง</button>
+    </div>
     <p class="sub" id="boardMonth" style="margin:0 0 2px"></p>
     <p class="sub" id="countdown" style="margin:0 0 10px"></p>
     <div class="mine" id="mine" hidden></div>
@@ -445,8 +449,9 @@ function buildEmbeds(r) {
 }
 
 // ===== ตัวเลขวิ่งนับ + แถบเทียบอันดับ 1 =====
-function countUp(el, to) {
-  const fmt = n => Math.round(n).toLocaleString("th-TH") + " ชิ้น";
+function countUp(el, to, unit) {
+  unit = unit || "ชิ้น";
+  const fmt = n => Math.round(n).toLocaleString("th-TH") + " " + unit;
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = fmt(to); return; }
   const t0 = performance.now(), dur = 900; el.textContent = fmt(0);
   (function step(now) { const k = Math.min(1, (now - t0) / dur); el.textContent = fmt(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); })(t0);
@@ -521,8 +526,12 @@ function renderMine(data) {
     box.append(mk("div", "m1", "ยังไม่มีชื่อคุณในอันดับ"), mk("div", "m2", boardOffset === 0 ? "ส่งของวันนี้เพื่อเริ่มไต่อันดับ! 💪" : "เดือนนี้เริ่มใหม่ได้เลย"));
   } else {
     const d = data[idx];
-    box.append(mk("div", "m1", "คุณอยู่อันดับ " + (idx + 1)), mk("div", "m2", fmt(d.total) + " ชิ้น · " + d.days + " วัน"));
-    if (idx === 0) box.append(mk("div", "m3", data[1] ? "👑 นำอันดับ 2 อยู่ " + fmt(d.total - data[1].total) + " ชิ้น" : "👑 คุณนำอยู่คนเดียว"));
+    const dy = x => Number(x.days) || 0;
+    box.append(mk("div", "m1", "คุณอยู่อันดับ " + (idx + 1)), mk("div", "m2", rankMode === "d" ? fmt(dy(d)) + " วัน · " + fmt(d.total) + " ชิ้น" : fmt(d.total) + " ชิ้น"));
+    if (rankMode === "d") {
+      if (idx === 0) box.append(mk("div", "m3", data[1] ? (dy(d) > dy(data[1]) ? "👑 นำอันดับ 2 อยู่ " + fmt(dy(d) - dy(data[1])) + " วัน" : "👑 วันเท่าอันดับ 2 แต่ชิ้นมากกว่า " + fmt(d.total - data[1].total) + " ชิ้น") : "👑 คุณนำอยู่คนเดียว"));
+      else { const a = data[idx - 1]; box.append(mk("div", "m3", dy(a) > dy(d) ? "ห่างอันดับ " + idx + " อยู่ " + fmt(dy(a) - dy(d)) + " วัน" : "วันเท่าอันดับ " + idx + " · เพิ่มอีก " + fmt(a.total - d.total + 1) + " ชิ้นจะแซง")); }
+    } else if (idx === 0) box.append(mk("div", "m3", data[1] ? "👑 นำอันดับ 2 อยู่ " + fmt(d.total - data[1].total) + " ชิ้น" : "👑 คุณนำอยู่คนเดียว"));
     else box.append(mk("div", "m3", "อีก " + fmt(data[idx - 1].total - d.total + 1) + " ชิ้นจะแซงอันดับ " + idx));
   }
   box.hidden = false;
@@ -569,6 +578,7 @@ const bkkMonth = offset => { // คืนค่า {key:"2026-10", label:"ตุ
   return { key, label: new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" }) };
 };
 let boardOffset = 0;
+let rankMode = "p"; try { if (localStorage.getItem("rm_rank") === "d") rankMode = "d"; } catch (e) {}
 // ===== สตรีก / ประกาศ Discord / สรุปปิดเดือน =====
 let STREAKS = {};
 async function loadStreaks() {
@@ -603,16 +613,20 @@ async function loadBoard() {
   $("boardMonth").textContent = mo.label;
   $("tabNow").setAttribute("aria-pressed", boardOffset === 0);
   $("tabPrev").setAttribute("aria-pressed", boardOffset === -1);
+  $("modeP").setAttribute("aria-pressed", rankMode === "p");
+  $("modeD").setAttribute("aria-pressed", rankMode === "d");
   rows.innerHTML = ""; $("pod").innerHTML = ""; $("mine").hidden = true; $("shareImg").hidden = true; tick();
   try {
     await loadStreaks();
     try { window.loadTypeBoard && window.loadTypeBoard(mo.key, mo.label); } catch (e) {}
     const data = mergeAliases(await rpc("leaderboard", { p_month: mo.key }));
+    const byD = rankMode === "d", dayOf = x => Number(x.days) || 0;
+    if (byD) data.sort((x, y) => dayOf(y) - dayOf(x) || y.total - x.total);
     if (!data || !data.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = "ยังไม่มีข้อมูลของเดือนนี้"; rows.appendChild(p); return; }
     const me = (savedNames().ign || "").toLowerCase(), isMe = d => !!me && String(d.ign).toLowerCase() === me;
     renderMine(data);
-    window.__bd = { data, mo }; $("shareImg").hidden = false;
-    const max = Math.max(1, ...data.map(x => Number(x.total)));
+    window.__bd = { data, mo, mode: rankMode }; $("shareImg").hidden = false;
+    const max = Math.max(1, ...data.map(x => byD ? dayOf(x) : Number(x.total)));
     const cls = ["gold", "silver", "bronze"], medal = ["🥇", "🥈", "🥉"];
     [1, 0, 2].forEach(i => { // เรียงแสดง: อันดับ 2, 1, 3
       const d = data[i]; if (!d) return;
@@ -620,9 +634,9 @@ async function loadBoard() {
       if (i === 0) { const c = document.createElement("div"); c.className = "crown"; c.textContent = "👑"; w.appendChild(c); }
       const nm = document.createElement("div"); nm.className = "pn"; nm.textContent = d.ign + fl(d) + (isMe(d) ? " ⭐" : "");
       const pt = document.createElement("div"); pt.className = "pt";
-      const tv = document.createElement("span"); countUp(tv, Number(d.total)); pt.appendChild(tv);
-      const sm = document.createElement("small"); sm.textContent = "ส่งมา " + d.days + " วัน"; pt.appendChild(sm);
-      pt.appendChild(meter(Number(d.total) / max));
+      const tv = document.createElement("span"); byD ? countUp(tv, dayOf(d), "วัน") : countUp(tv, Number(d.total)); pt.appendChild(tv);
+      if (byD) { const sm = document.createElement("small"); sm.textContent = Number(d.total).toLocaleString("th-TH") + " ชิ้น"; pt.appendChild(sm); }
+      pt.appendChild(meter((byD ? dayOf(d) : Number(d.total)) / max));
       const bar = document.createElement("div"); bar.className = "bar"; bar.textContent = medal[i];
       w.append(nm, pt, bar); $("pod").appendChild(w);
     });
@@ -631,10 +645,10 @@ async function loadBoard() {
       const rk = document.createElement("span"); rk.className = "rk"; rk.textContent = k + 4;
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = d.ign + fl(d) + (isMe(d) ? " ⭐ (คุณ)" : "");
       const tt = document.createElement("span"); tt.className = "tt";
-      const b = document.createElement("b"); countUp(b, Number(d.total));
-      const sm = document.createElement("small"); sm.textContent = "ส่งมา " + d.days + " วัน";
-      tt.append(b, sm);
-      const mid = document.createElement("div"); mid.className = "mid"; mid.append(nm, meter(Number(d.total) / max));
+      const b = document.createElement("b"); byD ? countUp(b, dayOf(d), "วัน") : countUp(b, Number(d.total));
+      tt.append(b);
+      if (byD) { const sm = document.createElement("small"); sm.textContent = Number(d.total).toLocaleString("th-TH") + " ชิ้น"; tt.append(sm); }
+      const mid = document.createElement("div"); mid.className = "mid"; mid.append(nm, meter((byD ? dayOf(d) : Number(d.total)) / max));
       li.append(rk, mid, tt); rows.appendChild(li);
     });
   } catch (e) {
@@ -643,6 +657,9 @@ async function loadBoard() {
 }
 $("tabNow").addEventListener("click", () => { boardOffset = 0; loadBoard(); });
 $("tabPrev").addEventListener("click", () => { boardOffset = -1; loadBoard(); });
+const setRank = m => { if (rankMode === m) return; rankMode = m; try { localStorage.setItem("rm_rank", m); } catch (e) {} loadBoard(); };
+$("modeP").addEventListener("click", () => setRank("p"));
+$("modeD").addEventListener("click", () => setRank("d"));
 loadBoard();
 refreshToday();
 setInterval(() => { if (!document.hidden && $("today").classList.contains("pending")) refreshToday(); }, 20000);
@@ -854,7 +871,7 @@ $("send").addEventListener("click", async () => {
     const rows = mergeAliases(typeRows.filter(r => r.type === selType).map(r => ({ ign: r.ign, total: r.total, days: r.days }))).slice(0, 10);
     const me = (savedNames().ign || "").toLowerCase(), md = ["🥇", "🥈", "🥉"], sum = rows.reduce((t, r) => t + r.total, 0);
     g("typeSum").textContent = typeLabel + " · รวม " + sum.toLocaleString("en-US") + " ชิ้น";
-    g("typeList").innerHTML = rows.map((r, i) => "<li class=\"" + (i === 0 ? "top1 " : "") + (String(r.ign).toLowerCase() === me ? "me" : "") + "\"><i class=\"rk2\">" + (md[i] || (i + 1)) + "</i><span><strong>" + esc(r.ign) + esc(fl(r)) + (String(r.ign).toLowerCase() === me ? " ⭐" : "") + "</strong><small>ส่งมา " + r.days + " วัน</small></span><b>" + r.total.toLocaleString("en-US") + " ชิ้น</b></li>").join("");
+    g("typeList").innerHTML = rows.map((r, i) => "<li class=\"" + (i === 0 ? "top1 " : "") + (String(r.ign).toLowerCase() === me ? "me" : "") + "\"><i class=\"rk2\">" + (md[i] || (i + 1)) + "</i><span><strong>" + esc(r.ign) + esc(fl(r)) + (String(r.ign).toLowerCase() === me ? " ⭐" : "") + "</strong></span><b>" + r.total.toLocaleString("en-US") + " ชิ้น</b></li>").join("");
   };
   window.loadTypeBoard = async (key, label) => {
     if (!BOARD_ON) return; typeLabel = label || "";
@@ -974,7 +991,7 @@ $("send").addEventListener("click", async () => {
     if (lg && lg.complete && lg.naturalWidth) { const h = 200, w = h * lg.naturalWidth / lg.naturalHeight; c.globalCompositeOperation = "lighten"; c.drawImage(lg, (W - w) / 2, 60, w, h); c.globalCompositeOperation = "source-over"; }
     c.textAlign = "center"; c.textBaseline = "alphabetic";
     const tg = c.createLinearGradient(0, 300, 0, 360); tg.addColorStop(0, "#ffffff"); tg.addColorStop(1, "#f2b42b");
-    c.fillStyle = tg; c.font = "italic 800 62px " + K; c.fillText("อันดับส่งของประจำเดือน", W / 2, 340);
+    c.fillStyle = tg; c.font = "italic 800 62px " + K; c.fillText(bd.mode === "d" ? "อันดับส่งสม่ำเสมอประจำเดือน" : "อันดับส่งของประจำเดือน", W / 2, 340);
     c.fillStyle = "#a7a59d"; c.font = "600 38px " + F; c.fillText(bd.mo.label, W / 2, 395);
     // โพเดียม
     const base = 940, slots = [[1, W / 2 - 300, 225, ["#f6f8fa", "#b9c0c7", "#7b838b"], "🥈"], [0, W / 2, 300, ["#ffe08a", "#f2b42b", "#b9780a"], "🥇"], [2, W / 2 + 300, 170, ["#f2b883", "#c27a3d", "#7a4318"], "🥉"]];
@@ -984,8 +1001,9 @@ $("send").addEventListener("click", async () => {
       c.save(); c.shadowColor = i === 0 ? "rgba(242,180,43,.6)" : "rgba(255,255,255,.2)"; c.shadowBlur = 36; c.fillStyle = gr; rr(c, cx - 140, top, 280, h, 24); c.fill(); c.restore();
       c.font = "80px " + EMO; c.fillStyle = "#fff"; c.fillText(medal, cx, top + 100);
       c.font = "700 40px " + F; c.fillStyle = i === 0 ? "#ffd978" : "#eceff1"; c.fillText(fit(c, d.ign, 270), cx, top - 112);
-      c.font = "italic 800 46px " + K; c.fillStyle = "#ffd978"; c.fillText(num(d.total) + " ชิ้น", cx, top - 62);
-      c.font = "400 28px " + F; c.fillStyle = "#a7a59d"; c.fillText("ส่งมา " + d.days + " วัน", cx, top - 24);
+      c.font = "italic 800 46px " + K; c.fillStyle = "#ffd978"; c.fillText(bd.mode === "d" ? num(d.days) + " วัน" : num(d.total) + " ชิ้น", cx, top - 62);
+      if (bd.mode === "d") { c.font = "400 28px " + F; c.fillStyle = "#a7a59d"; c.fillText(num(d.total) + " ชิ้น", cx, top - 24); }
+      
       if (i === 0) { c.font = "64px " + EMO; c.fillText("👑", cx, top - 150); }
     });
     // การ์ดของฉัน / รายชื่ออันดับถัดไป
@@ -993,9 +1011,12 @@ $("send").addEventListener("click", async () => {
     if (idx >= 0) {
       const d = data[idx]; c.fillStyle = "rgba(242,180,43,.13)"; rr(c, 70, 1000, W - 140, 240, 32); c.fill(); c.strokeStyle = "#f2b42b"; c.lineWidth = 3; c.stroke();
       c.font = "italic 800 66px " + K; c.fillStyle = "#ffd978"; c.fillText("คุณอยู่อันดับ " + (idx + 1), W / 2, 1085);
-      c.font = "600 44px " + F; c.fillStyle = "#fff"; c.fillText(fit(c, d.ign, 800) + " · " + num(d.total) + " ชิ้น · " + d.days + " วัน", W / 2, 1150);
+      c.font = "600 44px " + F; c.fillStyle = "#fff"; c.fillText(fit(c, d.ign, 800) + " · " + (bd.mode === "d" ? num(d.days) + " วัน · " : "") + num(d.total) + " ชิ้น", W / 2, 1150);
       c.font = "400 32px " + F; c.fillStyle = "#a7a59d";
-      c.fillText(idx === 0 ? (data[1] ? "👑 นำอันดับ 2 อยู่ " + num(d.total - data[1].total) + " ชิ้น" : "👑 นำอยู่คนเดียว") : "อีก " + num(data[idx - 1].total - d.total + 1) + " ชิ้นจะแซงอันดับ " + idx, W / 2, 1205);
+      const dd = x => Number(x.days) || 0;
+      c.fillText(bd.mode === "d"
+        ? (idx === 0 ? (data[1] ? (dd(d) > dd(data[1]) ? "👑 นำอันดับ 2 อยู่ " + num(dd(d) - dd(data[1])) + " วัน" : "👑 วันเท่าอันดับ 2 แต่ชิ้นมากกว่า") : "👑 นำอยู่คนเดียว") : (dd(data[idx - 1]) > dd(d) ? "ห่างอันดับ " + idx + " อยู่ " + num(dd(data[idx - 1]) - dd(d)) + " วัน" : "วันเท่าอันดับ " + idx + " · เพิ่มอีก " + num(data[idx - 1].total - d.total + 1) + " ชิ้นจะแซง"))
+        : (idx === 0 ? (data[1] ? "👑 นำอันดับ 2 อยู่ " + num(d.total - data[1].total) + " ชิ้น" : "👑 นำอยู่คนเดียว") : "อีก " + num(data[idx - 1].total - d.total + 1) + " ชิ้นจะแซงอันดับ " + idx), W / 2, 1205);
     } else {
       const rest = data.slice(3, 6);
       if (!rest.length) { c.font = "600 42px " + F; c.fillStyle = "#ffd978"; c.fillText("ส่งของทุกวัน ไต่อันดับไปด้วยกัน 💪", W / 2, 1110); }
@@ -1003,7 +1024,7 @@ $("send").addEventListener("click", async () => {
         const y = 1000 + k * 84; c.fillStyle = "#15130f"; rr(c, 70, y, W - 140, 70, 20); c.fill(); c.strokeStyle = "#3d3322"; c.lineWidth = 2; c.stroke();
         c.textAlign = "center"; c.font = "italic 800 34px " + K; c.fillStyle = "#ffd978"; c.fillText(String(k + 4), 118, y + 46);
         c.textAlign = "left"; c.font = "600 32px " + F; c.fillStyle = "#eceff1"; c.fillText(fit(c, d.ign, 520), 165, y + 46);
-        c.textAlign = "right"; c.font = "700 32px " + F; c.fillStyle = "#ffd978"; c.fillText(num(d.total) + " ชิ้น", W - 110, y + 46);
+        c.textAlign = "right"; c.font = "700 32px " + F; c.fillStyle = "#ffd978"; c.fillText(bd.mode === "d" ? num(d.days) + " วัน · " + num(d.total) + " ชิ้น" : num(d.total) + " ชิ้น", W - 110, y + 46);
       });
       c.textAlign = "center";
     }
