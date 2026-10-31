@@ -268,7 +268,7 @@ $("sum").onclick = async () => {
     const raw = await rpc("leaderboard", { p_month: key }), top = (raw || []).sort((a, b) => b.total - a.total).slice(0, 3), md = ["🥇", "🥈", "🥉"];
     if (!top.length) return say("เดือนที่แล้วไม่มีข้อมูล", "err");
     // ยิงเข้า Discord ผ่านฟังก์ชันในฐานข้อมูล (notify_discord) แทนการเก็บ Webhook URL ไว้ในหน้าเว็บ
-    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [{ title: "🏆 สรุปอันดับประจำเดือน " + label, color: 0xF2B42B, description: top.map((d, i) => md[i] + " **" + d.ign + "** — " + Number(d.total).toLocaleString("th-TH") + " ชิ้น (" + d.days + " วัน)").join("\n") + "\n\nขอบคุณทุกคนที่ส่งของ 💛" }] } });
+    await pcall("admin_notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [{ title: "🏆 สรุปอันดับประจำเดือน " + label, color: 0xF2B42B, description: top.map((d, i) => md[i] + " **" + d.ign + "** — " + Number(d.total).toLocaleString("th-TH") + " ชิ้น (" + d.days + " วัน)").join("\n") + "\n\nขอบคุณทุกคนที่ส่งของ 💛" }] } });
     say("ส่งคำสั่งโพสต์แล้ว ลองเช็กในดิสคอร์ดอีกครั้ง", "ok");
   } catch (e) { say("โพสต์ไม่สำเร็จ", "err"); }
 };
@@ -294,7 +294,7 @@ async function announceTop(before, ign) {
     const after = await topNow();
     if (!before || !after || String(after.ign).toLowerCase() === String(before.ign).toLowerCase()) return;
     if (String(after.ign).toLowerCase() !== String(ign).toLowerCase()) return;
-    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [{ title: "👑 เปลี่ยนเจ้าของอันดับ 1!", color: 0xF2B42B, description: "**" + after.ign + "** แซง **" + before.ign + "** ขึ้นเป็นอันดับ 1 ด้วย **" + Number(after.total).toLocaleString("th-TH") + "** ชิ้น", footer: { text: "Rockman · ส่งของรายวัน" } }] } });
+    await pcall("admin_notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [{ title: "👑 เปลี่ยนเจ้าของอันดับ 1!", color: 0xF2B42B, description: "**" + after.ign + "** แซง **" + before.ign + "** ขึ้นเป็นอันดับ 1 ด้วย **" + Number(after.total).toLocaleString("th-TH") + "** ชิ้น", footer: { text: "Rockman · ส่งของรายวัน" } }] } });
   } catch (e) {}
 }
 function buildEmbeds(r) {
@@ -400,7 +400,7 @@ async function remindLate() {
   try { localStorage.setItem("lateRemind", String(Date.now())); } catch (e) {}
   const role = CFG.adminRoleId ? String(CFG.adminRoleId) : "";
   try {
-    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", content: role ? "<@&" + role + ">" : undefined, allowed_mentions: role ? { roles: [role] } : { parse: [] }, embeds: [{ title: "⏰ มีรายการรออนุมัติค้างเกิน 5 นาที", color: 0xFF8A7A, description: late.slice(0, 10).map(r => "• **" + r.ign + "** — รอมา " + waitTxt(Date.now() - new Date(r.created_at).getTime())).join("\n") + (late.length > 10 ? "\n…และอีก " + (late.length - 10) + " รายการ" : "") + "\n\nรบกวนแอดมินเข้าไปตรวจ/อนุมัติด้วยครับ", footer: { text: "Rockman · แจ้งเตือนอัตโนมัติ" } }] } });
+    await pcall("admin_notify_discord", { p_payload: { username: "ส่งของรายวัน", content: role ? "<@&" + role + ">" : undefined, allowed_mentions: role ? { roles: [role] } : { parse: [] }, embeds: [{ title: "⏰ มีรายการรออนุมัติค้างเกิน 5 นาที", color: 0xFF8A7A, description: late.slice(0, 10).map(r => "• **" + r.ign + "** — รอมา " + waitTxt(Date.now() - new Date(r.created_at).getTime())).join("\n") + (late.length > 10 ? "\n…และอีก " + (late.length - 10) + " รายการ" : "") + "\n\nรบกวนแอดมินเข้าไปตรวจ/อนุมัติด้วยครับ", footer: { text: "Rockman · แจ้งเตือนอัตโนมัติ" } }] } });
   } catch (e) {}
 }
 // ===== ประวัติอนุมัติ/ปฏิเสธ =====
@@ -441,7 +441,7 @@ async function approvePend(r) {
     const before = await topNow();
     if (!approved) { const x = await pcall("admin_approve", { p_id: r.id }); row = x.row; approved = true; }
     pm("กำลังส่งเข้า Discord...");
-    await rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: buildEmbeds(row) } });
+    await pcall("admin_notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: buildEmbeds(row) } });
     await pcall("admin_mark_posted", { p_id: r.id });
     announceTop(before, r.ign);
     pm("อนุมัติ " + r.ign + " แล้ว ✅ นับยอดและลง Discord เรียบร้อย", "ok");

@@ -575,26 +575,9 @@ async function loadStreaks() {
   try { const a = await rpc("get_streaks"); STREAKS = {}; (a || []).forEach(x => { STREAKS[String(x.k).toLowerCase()] = x.n; }); } catch (e) {}
 }
 const fl = d => { const n = STREAKS[String(d.ign).toLowerCase()]; return n ? " 🔥" + n : ""; };
-const hook = embed => rpc("notify_discord", { p_payload: { username: "ส่งของรายวัน", allowed_mentions: { parse: [] }, embeds: [embed] } }).catch(() => {});
-async function topNow() { try { return mergeAliases(await rpc("leaderboard", { p_month: bkkMonth(0).key }))[0] || null; } catch (e) { return null; } }
-async function announceTop(before, ign) {
-  try {
-    const after = await topNow();
-    if (!before || !after || String(after.ign).toLowerCase() === String(before.ign).toLowerCase()) return;
-    if (String(after.ign).toLowerCase() !== String(ign).toLowerCase()) return;
-    await hook({ title: "👑 เปลี่ยนเจ้าของอันดับ 1!", color: 0xF2B42B, description: "**" + after.ign + "** แซง **" + before.ign + "** ขึ้นเป็นอันดับ 1 ด้วย **" + Number(after.total).toLocaleString("th-TH") + "** ชิ้น", footer: { text: "Rockman · ส่งของรายวัน" } });
-  } catch (e) {}
-}
 async function postLastMonthSummary() {
   if (!BOARD_ON) return;
-  const mo = bkkMonth(-1);
-  try {
-    if ((await rpc("claim_month_post", { p_month: mo.key })) !== true) return;
-    const top = mergeAliases(await rpc("leaderboard", { p_month: mo.key })).slice(0, 3);
-    if (!top.length) return;
-    const medals = ["🥇", "🥈", "🥉"];
-    await hook({ title: "🏆 สรุปอันดับประจำเดือน " + mo.label, color: 0xF2B42B, description: top.map((d, i) => medals[i] + " **" + d.ign + "** — " + Number(d.total).toLocaleString("th-TH") + " ชิ้น (" + d.days + " วัน)").join("\n") + "\n\nขอบคุณทุกคนที่ส่งของ 💛", footer: { text: "Rockman · ส่งของรายวัน" } });
-  } catch (e) {}
+  try { await rpc("post_last_month_summary"); } catch (e) {} // ฐานข้อมูลสร้างข้อความและโพสต์เอง เดือนละครั้ง
 }
 // สีแถบข้างและไอคอนของการ์ดใน Discord ตามประเภทของ (จับจากคำในชื่อ ใส่เพิ่มได้)
 const TYPE_STYLES = [
